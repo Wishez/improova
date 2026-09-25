@@ -1,0 +1,58 @@
+@reference '../../../tailwind.css';
+
+.logs {
+  @apply m-0 flex list-none flex-col gap-1 p-0;
+}
+
+.logs__row {
+  @apply flex items-center gap-1 rounded-control transition-colors duration-(--duration-fast) hover:bg-surface-2;
+}
+
+.logs__main {
+  @apply flex min-w-0 flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent px-2 py-1.5 text-left text-body text-text-2;
+}
+
+.logs__date {
+  @apply shrink-0 text-meta text-text-3;
+}
+
+.logs__item,
+.logs__type {
+  @apply min-w-0 flex-1 truncate;
+}
+
+.logs__dur {
+  @apply shrink-0 font-semibold text-text-1;
+}
+
+.logs__edited {
+  @apply shrink-0 text-meta text-text-3;
+}
+
+.logs__delete {
+  @apply opacity-60 hover:opacity-100;
+}
+
+.logs__empty {
+  @apply px-2 py-1 text-body text-text-3;
+}
+
+.logs__add {
+  @apply mt-1;
+}
+
+.logEdit {
+  @apply grid w-full grid-cols-1 gap-3 rounded-control bg-surface-2 p-3 md:grid-cols-3;
+}
+
+.logEdit__message {
+  @apply md:col-span-3;
+}
+
+.logEdit__message_warn {
+  @apply text-meta text-warning;
+}
+
+.logEdit__actions {
+  @apply flex justify-end gap-2 md:col-span-3;
+}

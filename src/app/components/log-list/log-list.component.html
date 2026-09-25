@@ -1,0 +1,68 @@
+<ng-template #editor>
+  <div class="logEdit">
+    <label class="field">
+      <span class="field__label">Начало</span>
+      <input class="input" type="datetime-local" [value]="draft().start" (change)="patch('start', $event)" />
+    </label>
+    <label class="field logEdit__minutes">
+      <span class="field__label">Минуты</span>
+      <input class="input num" type="number" min="1" max="720" [value]="draft().minutes" (input)="patch('minutes', $event)" />
+    </label>
+    <label class="field">
+      <span class="field__label">Тип</span>
+      <select class="input" [value]="draft().type" (change)="patch('type', $event)">
+        @for (type of types; track type) {
+          <option [value]="type" [selected]="type === draft().type">{{ typeLabel[type] }}</option>
+        }
+      </select>
+    </label>
+    @if (error()) {
+      <span class="field__error logEdit__message" role="alert">{{ error() }}</span>
+    }
+    @if (overlapWarning()) {
+      <span class="logEdit__message logEdit__message_warn" role="alert">{{ overlapWarning() }}</span>
+    }
+    <div class="logEdit__actions">
+      <button tuiButton type="button" size="xs" appearance="flat" (click)="cancel()">{{ overlapWarning() ? 'Исправить время' : 'Отмена' }}</button>
+      <button tuiButton type="button" size="xs" (click)="save()">{{ overlapWarning() ? 'Сохранить обе' : 'Сохранить' }}</button>
+    </div>
+  </div>
+</ng-template>
+
+<ul class="logs">
+  @for (log of visible(); track log.id) {
+    <li class="logs__row">
+      @if (editingId() === log.id) {
+        <ng-container [ngTemplateOutlet]="editor" />
+      } @else {
+        <button type="button" class="logs__main" (click)="edit(log)" [attr.aria-label]="'Изменить сессию ' + (log.startedAt | clockTime)">
+          <span class="logs__date num">{{ dayOf(log) | dayShort }}, {{ log.startedAt | clockTime }}–{{ log.endedAt | clockTime }}</span>
+          @if (showItem()) {
+            <span class="logs__item">{{ itemTitle(log) }}</span>
+          } @else {
+            <span class="logs__type">{{ typeLabel[log.type] }}</span>
+          }
+          <span class="logs__dur num">{{ log.durationMin | minutes }}</span>
+          @if (log.editedAt) {
+            <span class="logs__edited" tuiHint="Время исправлено вручную">изм.</span>
+          }
+        </button>
+        <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.trash-2" class="logs__delete" (click)="remove(log)">
+          Удалить сессию
+        </button>
+      }
+    </li>
+  } @empty {
+    @if (!adding()) {
+      <li class="logs__empty">Сессий ещё не было.</li>
+    }
+  }
+</ul>
+@if (adding()) {
+  <ng-container [ngTemplateOutlet]="editor" />
+}
+@if (itemId() !== undefined && !adding()) {
+  <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.plus" class="logs__add" (click)="startAdding()">
+    Добавить сессию вручную
+  </button>
+}

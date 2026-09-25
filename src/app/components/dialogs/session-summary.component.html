@@ -1,0 +1,44 @@
+<ng-template
+  [tuiDialog]="log() !== null"
+  [tuiDialogOptions]="{ label: heading(), size: 'm', dismissible: true }"
+  (tuiDialogChange)="onOpenChange($event)"
+>
+  <div class="dlg">
+    <p class="dlg__subtitle">{{ subtitle() }}</p>
+    <label class="field dlg__short">
+      <span class="field__label">Длительность, мин</span>
+      <input class="input num" type="number" min="1" max="720" [class.input_invalid]="durationError()" [value]="duration()" (change)="setDuration($event)" />
+      @if (durationError()) {
+        <span class="field__error" role="alert">{{ durationError() }}</span>
+      }
+    </label>
+    <div class="dlg__grid">
+      <label class="field">
+        <span class="field__label">Что получилось</span>
+        <textarea class="input" rows="2" [value]="worked()" (input)="worked.set(text($event))"></textarea>
+      </label>
+      <label class="field">
+        <span class="field__label">Что нет</span>
+        <textarea class="input" rows="2" [value]="failed()" (input)="failed.set(text($event))"></textarea>
+      </label>
+    </div>
+    <label class="field">
+      <span class="field__label">Задача на следующую сессию</span>
+      <input class="input" type="text" [value]="next()" (input)="next.set(text($event))" />
+      <span class="field__hint">Покажем при следующем старте этого топика</span>
+    </label>
+    <label class="field">
+      <span class="field__label">Конспект</span>
+      <textarea class="input" rows="3" [value]="body()" (input)="body.set(text($event))"></textarea>
+    </label>
+    @if (canClose()) {
+      <label class="dlg__check">
+        <input tuiCheckbox type="checkbox" size="m" [ngModel]="done()" (ngModelChange)="done.set(!done())" />
+        <span>Топик пройден</span>
+      </label>
+    }
+    <div class="dlg__actions">
+      <button tuiButton type="button" size="m" (click)="finish()">Готово</button>
+    </div>
+  </div>
+</ng-template>
