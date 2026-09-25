@@ -18,8 +18,6 @@ export class UiStateService {
   readonly pickerOpen = signal<TSessionType | null>(null);
   readonly paletteOpen = signal(false);
   readonly newNoteForItem = signal<string | null | undefined>(undefined);
-  /** Черновик конспекта из режима фокуса — подставляется в карточку итога. */
-  readonly sessionDraft = signal('');
 
   openItem(itemId: string): void {
     this.drawerItemId.set(itemId);

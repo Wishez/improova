@@ -1,7 +1,7 @@
 <section class="guide" aria-labelledby="guide-title">
   <div class="guide__head">
     <h3 id="guide-title" class="card__title guide__h">Ориентир</h3>
-    @if (!editing() && guide()) {
+    @if (!editing() && guide() && !session()) {
       <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.pencil" (click)="edit()">Изменить</button>
     }
   </div>
@@ -140,10 +140,10 @@
     </form>
   } @else if (guide(); as current) {
     <p class="guide__goal">{{ current.goal }}</p>
-    @if (task()) {
+    @if (task() && !session()) {
       <p class="guide__p"><span class="guide__k">Задание</span> {{ task() }}</p>
     }
-    @if (current.steps.length > 0) {
+    @if (current.steps.length > 0 && !session()) {
       <ol class="guide__steps">
         @for (entry of current.steps; track $index) {
           <li class="guide__step">
@@ -152,7 +152,7 @@
           </li>
         }
       </ol>
-      <p class="guide__meta muted num">Шаги сессии — {{ total() }} мин, в таймере масштабируются под длину блока</p>
+      <p class="guide__meta muted num">Шаги сессии — {{ total() }} мин, таймер ведёт шаги по этим минутам</p>
     }
     @if (current.stopCriterion) {
       <p class="guide__p"><span class="guide__k">Стоп-критерий</span> {{ current.stopCriterion }}</p>
@@ -213,6 +213,8 @@
         </ul>
       </div>
     }
+  } @else if (session()) {
+    <p class="muted guide__p">У топика нет ориентира. Добавить его можно в карточке топика после сессии.</p>
   } @else {
     <div class="guide__empty">
       <p class="muted guide__p">У топика нет ориентира: цели, шагов и ссылок на сессию.</p>

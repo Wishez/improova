@@ -1,82 +1,86 @@
 @if (open()) {
   <section class="focus" role="dialog" aria-modal="true" aria-label="Режим фокуса">
-    <div class="focus__inner">
-      <header class="focus__head">
-        <span class="focus__type">{{ title() }}</span>
-        <button tuiButton type="button" size="s" appearance="flat" iconStart="@tui.minimize-2" (click)="close()">Выйти · Esc</button>
-      </header>
-      <div class="focus__clock num" [class.focus__clock_paused]="timer.paused()">{{ timer.clock() }}</div>
-      @if (task()) {
-        <div class="focus__task">
-          <span class="focus__label">Задание</span>
-          <span>{{ task() }}</span>
-        </div>
-      }
-      @if (timer.phaseIndex() >= 0) {
-        <ol class="phases">
-          @for (phase of timer.phases(); track phase.title; let index = $index) {
-            <li class="phases__item" [class.phases__item_active]="index === timer.phaseIndex()" [class.phases__item_done]="index < timer.phaseIndex()">
-              <span class="phases__title">{{ phase.title }} · {{ round(phase.minutes) }} мин</span>
-              <span class="phases__hint">{{ phase.hint }}</span>
-            </li>
-          }
-        </ol>
-        @if (step(); as current) {
-          <div class="stepBar">
-            <span class="stepBar__text num">
-              Осталось {{ current.remaining }} мин
-              @if (current.next) {
-                · дальше: {{ current.next }}
-              }
-            </span>
-            <div class="stepBar__actions">
-              <button tuiButton type="button" size="xs" appearance="secondary" (click)="timer.extendStep()">+5 мин</button>
-              @if (current.next) {
-                <button tuiButton type="button" size="xs" appearance="secondary" iconEnd="@tui.skip-forward" (click)="timer.nextStep()">Следующий шаг</button>
-              }
-            </div>
-          </div>
+    <div class="focus__layout" [class.focus__layout_withGuide]="item() !== null">
+      <div class="focus__inner">
+        <header class="focus__head">
+          <span class="focus__type">{{ title() }}</span>
+          <button tuiButton type="button" size="s" appearance="flat" iconStart="@tui.minimize-2" (click)="close()">Выйти · Esc</button>
+        </header>
+        <div class="focus__clock num" [class.focus__clock_paused]="timer.paused()">{{ timer.clock() }}</div>
+        @if (timer.totalMin() > 0) {
+          <p class="focus__total num" [class.focus__total_over]="over()">
+            {{ over() ? 'Время сессии вышло' : 'Сессия' }} · {{ round(timer.totalMin()) }} мин
+          </p>
         }
-      }
-      @if (guide(); as current) {
-        @if (current.stopCriterion || mainRef()) {
+        @if (task()) {
           <div class="focus__task">
-            @if (current.stopCriterion) {
-              <span class="focus__label">Стоп-критерий</span>
-              <span>{{ current.stopCriterion }}</span>
-            }
-            @if (mainRef(); as reference) {
-              <span class="focus__label">Референс</span>
-              @if (reference.url) {
-                <a class="focus__link" [href]="reference.url" target="_blank" rel="noopener noreferrer">{{ reference.title }}{{ reference.locator ? ' · ' + reference.locator : '' }}</a>
-              } @else {
-                <span>{{ reference.title }}</span>
-              }
-            }
+            <span class="focus__label">Задание</span>
+            <span>{{ task() }}</span>
           </div>
         }
-      }
-      @if (timer.previousTask()) {
-        <div class="focus__task">
-          <span class="focus__label">Задача из прошлой сессии</span>
-          <span>{{ timer.previousTask() }}</span>
+        @if (timer.phaseIndex() >= 0) {
+          <ol class="phases">
+            @for (phase of timer.phases(); track $index; let index = $index) {
+              <li class="phases__item" [class.phases__item_active]="index === timer.phaseIndex()" [class.phases__item_done]="index < timer.phaseIndex()">
+                <span class="phases__title">{{ phase.title }} · {{ round(phase.minutes) }} мин</span>
+                <span class="phases__hint">{{ phase.hint }}</span>
+              </li>
+            }
+          </ol>
+          @if (step(); as current) {
+            <div class="stepBar">
+              <span class="stepBar__text num">
+                Осталось {{ current.remaining }} мин
+                @if (current.next) {
+                  · дальше: {{ current.next }}
+                }
+              </span>
+              <div class="stepBar__actions">
+                @if (current.hasPrevious) {
+                  <button tuiButton type="button" size="xs" appearance="secondary" iconStart="@tui.skip-back" (click)="timer.prevStep()">Предыдущий шаг</button>
+                }
+                <button tuiButton type="button" size="xs" appearance="secondary" (click)="timer.extendStep()">+5 мин</button>
+                @if (current.next) {
+                  <button tuiButton type="button" size="xs" appearance="secondary" iconEnd="@tui.skip-forward" (click)="timer.nextStep()">Следующий шаг</button>
+                }
+              </div>
+            </div>
+          }
+        }
+        @if (timer.previousTask()) {
+          <div class="focus__task">
+            <span class="focus__label">Задача из прошлой сессии</span>
+            <span>{{ timer.previousTask() }}</span>
+          </div>
+        } @else if (isStudy() && !item()?.guide) {
+          <div class="focus__task">
+            <span class="focus__label">Один навык на сессию</span>
+            <span>Что именно тренируешь?</span>
+          </div>
+        }
+        <div class="focus__note">
+          <app-markdown-editor
+            label="Конспект — попадёт в карточку итога"
+            [rows]="8"
+            [split]="item() === null"
+            [value]="drafts.draft().body"
+            (valueChange)="drafts.set('body', $event)"
+            (committed)="drafts.flush()"
+          />
+          <span class="field__hint" aria-live="polite">{{ drafts.saving() ? 'Сохраняем…' : 'Сохранено — переживёт перезагрузку' }}</span>
         </div>
-      } @else if (isStudy()) {
-        <div class="focus__task">
-          <span class="focus__label">Один навык на сессию</span>
-          <span>Что именно тренируешь?</span>
+        <div class="focus__actions">
+          <button tuiButton type="button" size="m" appearance="secondary" [iconStart]="timer.paused() ? '@tui.play' : '@tui.pause'" (click)="timer.toggle()">
+            {{ timer.paused() ? 'Продолжить' : 'Пауза' }}
+          </button>
+          <button tuiButton type="button" size="m" iconStart="@tui.square" (click)="timer.stop()">Стоп</button>
         </div>
-      }
-      <label class="field focus__note">
-        <span class="field__label">Конспект — попадёт в карточку итога</span>
-        <textarea class="input" rows="4" [value]="ui.sessionDraft()" (input)="onDraft($event)"></textarea>
-      </label>
-      <div class="focus__actions">
-        <button tuiButton type="button" size="m" appearance="secondary" [iconStart]="timer.paused() ? '@tui.play' : '@tui.pause'" (click)="timer.toggle()">
-          {{ timer.paused() ? 'Продолжить' : 'Пауза' }}
-        </button>
-        <button tuiButton type="button" size="m" iconStart="@tui.square" (click)="timer.stop()">Стоп</button>
       </div>
+      @if (item(); as current) {
+        <aside class="focus__guide" aria-label="Ориентир">
+          <app-guide-card [item]="current" [session]="true" />
+        </aside>
+      }
     </div>
   </section>
 }

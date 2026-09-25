@@ -7,6 +7,7 @@ export * from './logs.service';
 export * from './notes.service';
 export * from './plan.service';
 export * from './program.service';
+export * from './session-draft.service';
 export * from './sound.service';
 export * from './timer.service';
 export * from './toast.service';

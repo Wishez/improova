@@ -4,8 +4,7 @@
   @apply flex flex-col gap-4;
 }
 
-.noteEditor__head,
-.noteEditor__bodyHead {
+.noteEditor__head {
   @apply flex items-center justify-between gap-3;
 }
 
@@ -15,14 +14,6 @@
 
 .noteEditor__state {
   @apply shrink-0 text-meta text-text-3;
-}
-
-.noteEditor__body {
-  @apply min-h-36;
-}
-
-.noteEditor__preview {
-  @apply min-h-16 rounded-control bg-surface-2 p-3;
 }
 
 .noteEditor__grid {

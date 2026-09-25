@@ -4,6 +4,7 @@ import { defaultMeta } from '../services/data.store';
 import type { IItem } from '../types';
 import { MemoryAdapter } from './memory.adapter';
 import { checkSnapshot } from './snapshot';
+import { SCHEMA_VERSION } from './storage-adapter';
 
 describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
   it('битый JSON и чужой файл отклоняются без изменений', () => {
@@ -44,7 +45,7 @@ describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
     const check = checkSnapshot(JSON.stringify(file));
     expect(check.ok).toBe(true);
     if (check.ok) {
-      expect(check.snapshot.schemaVersion).toBe(3);
+      expect(check.snapshot.schemaVersion).toBe(SCHEMA_VERSION);
       expect(check.snapshot.data.items?.[0]).toMatchObject({ guide: null, routeRole: null });
       expect(check.snapshot.data.budgets?.[0]?.seasonalWeights).toBe(false);
       expect(check.snapshot.data.routeBlocks).toBeUndefined();
@@ -82,6 +83,14 @@ describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
     expect(checkSnapshot(JSON.stringify({ app: 'improva', schemaVersion: 3, data: { resources: [resource] } }))).toMatchObject({ path: 'resources[0].access' });
     const item = { ...itemFixture({ id: 'a', topicId: 't' }), checkpointDay: 6.5 };
     expect(checkSnapshot(JSON.stringify({ app: 'improva', schemaVersion: 3, data: { items: [item] } }))).toMatchObject({ path: 'items[0].checkpointDay' });
+  });
+
+  it('черновик конспекта переживает экспорт; битый черновик сбрасывается, а не ломает импорт (v4)', () => {
+    const draft = { logId: null, body: '## Штудии', worked: '', failed: '', next: '' };
+    const good = checkSnapshot(JSON.stringify({ app: 'improva', schemaVersion: 4, data: { meta: [{ ...defaultMeta(), sessionDraft: draft }] } }));
+    expect(good.ok && good.snapshot.data.meta?.[0]?.sessionDraft).toEqual(draft);
+    const bad = checkSnapshot(JSON.stringify({ app: 'improva', schemaVersion: 4, data: { meta: [{ ...defaultMeta(), sessionDraft: { body: 5 } }] } }));
+    expect(bad.ok && bad.snapshot.data.meta?.[0]?.sessionDraft).toBeNull();
   });
 
   it('пакетная запись применяет изменения и удаления вместе (НФТ 1.3)', async () => {

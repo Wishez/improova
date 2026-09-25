@@ -1,6 +1,6 @@
 import { assignCourseKeys } from '../domain';
 import { COURSE } from '../seed';
-import type { ICollections, IGuide, IGuideLink, IRouteArtist, ISnapshot, TCollection, TSnapshotKind } from '../types';
+import type { ICollections, IGuide, IGuideLink, IRouteArtist, ISessionDraft, ISnapshot, TCollection, TSnapshotKind } from '../types';
 import { COLLECTIONS, SCHEMA_VERSION } from './storage-adapter';
 
 type TFieldRule = 'string' | 'number' | 'boolean' | 'boolean?' | 'string?' | 'number?' | 'array' | 'array?' | 'object' | 'object?';
@@ -106,6 +106,7 @@ const RULES: Record<TCollection, Record<string, TFieldRule>> = {
     courseVersion: 'number?',
     dismissedCourseKeys: 'array?',
     courseBannerDismissed: 'number?',
+    sessionDraft: 'object?',
   },
   routeBlocks: {
     ...BASE,
@@ -166,6 +167,15 @@ export function isGuide(value: unknown): value is IGuide {
     value['references'].every(isGuideLink) &&
     isStringArray(value['imageIds']) &&
     isStringArray(value['pitfalls'])
+  );
+}
+
+/** Битый черновик конспекта не блокирует импорт — он просто не восстанавливается. */
+export function isSessionDraft(value: unknown): value is ISessionDraft {
+  return (
+    isRecord(value) &&
+    (value['logId'] === null || typeof value['logId'] === 'string') &&
+    ['body', 'worked', 'failed', 'next'].every((field) => typeof value[field] === 'string')
   );
 }
 
@@ -345,6 +355,7 @@ function normalizePartial(data: Partial<ICollections>): Partial<ICollections> {
       courseVersion: 'courseVersion' in meta ? meta.courseVersion : courseVersion,
       dismissedCourseKeys: meta.dismissedCourseKeys ?? [],
       courseBannerDismissed: meta.courseBannerDismissed ?? null,
+      sessionDraft: isSessionDraft(meta.sessionDraft) ? meta.sessionDraft : null,
     }));
   }
   return next;

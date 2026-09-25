@@ -1,14 +1,15 @@
 import { FormsModule } from '@angular/forms';
-import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { TuiButton, TuiCheckbox, TuiDialog } from '@taiga-ui/core';
 import { isCountable } from '../../domain';
-import { DataStore, LOG_ERROR_TEXT, LogsService, NotesService, ProgramService, UiStateService } from '../../services';
+import { DataStore, LOG_ERROR_TEXT, LogsService, NotesService, ProgramService, SessionDraftService, UiStateService, type TDraftField } from '../../services';
 import { SESSION_TYPE_LABEL, formatMinutes } from '../../utils';
+import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.component';
 
-/** Карточка итога после стопа таймера: длительность, рефлексия, галочка (FR-13, M7). */
+/** Карточка итога после стопа таймера: длительность, рефлексия, галочка (FR-13, M7). Всё написанное — в черновике. */
 @Component({
   selector: 'app-session-summary',
-  imports: [FormsModule, TuiDialog, TuiButton, TuiCheckbox],
+  imports: [FormsModule, TuiDialog, TuiButton, TuiCheckbox, MarkdownEditorComponent],
   templateUrl: './session-summary.component.html',
   styleUrl: './dialogs.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -19,6 +20,7 @@ export class SessionSummaryComponent {
   private readonly notes = inject(NotesService);
   private readonly program = inject(ProgramService);
   protected readonly ui = inject(UiStateService);
+  protected readonly drafts = inject(SessionDraftService);
 
   protected readonly log = computed(() => {
     const id = this.ui.summaryLogId();
@@ -41,10 +43,7 @@ export class SessionSummaryComponent {
     return this.item()?.title ?? (log ? SESSION_TYPE_LABEL[log.type] : '');
   });
 
-  protected readonly worked = signal('');
-  protected readonly failed = signal('');
-  protected readonly next = signal('');
-  protected readonly body = signal('');
+  protected readonly draft = this.drafts.draft;
   protected readonly done = signal(false);
   protected readonly duration = signal(0);
   protected readonly durationError = signal('');
@@ -55,11 +54,16 @@ export class SessionSummaryComponent {
       if (log) {
         this.duration.set(log.durationMin);
         this.done.set(this.item()?.doneAt != null);
-      }
-    });
-    effect(() => {
-      if (this.ui.summaryLogId()) {
-        this.body.set(this.ui.sessionDraft());
+        // Черновик из режима фокуса привязывается к логу; чужой устаревший — сбрасывается
+        untracked(() => {
+          const logId = this.drafts.draft().logId;
+          if (logId !== log.id) {
+            if (logId !== null) {
+              this.drafts.clear();
+            }
+            this.drafts.attach(log.id);
+          }
+        });
       }
     });
   }
@@ -67,6 +71,10 @@ export class SessionSummaryComponent {
   protected text(event: Event): string {
     const target = event.target;
     return target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement ? target.value : '';
+  }
+
+  protected edit(field: TDraftField, value: string): void {
+    this.drafts.set(field, value);
   }
 
   protected setDuration(event: Event): void {
@@ -91,16 +99,17 @@ export class SessionSummaryComponent {
   /** Лог уже сохранён; заметка создаётся, только если что-то написано. */
   protected finish(): void {
     const log = this.log();
+    const draft = this.draft();
     if (log) {
-      const hasText = [this.worked(), this.failed(), this.next(), this.body()].some((value) => value.trim() !== '');
+      const hasText = [draft.worked, draft.failed, draft.next, draft.body].some((value) => value.trim() !== '');
       if (hasText) {
         this.notes.create({
           itemId: log.itemId,
           logId: log.id,
-          body: this.body(),
-          worked: this.worked(),
-          failed: this.failed(),
-          next: this.next(),
+          body: draft.body,
+          worked: draft.worked,
+          failed: draft.failed,
+          next: draft.next,
         });
       }
       const item = this.item();
@@ -108,12 +117,8 @@ export class SessionSummaryComponent {
         this.program.setDone(item.id, this.done());
       }
     }
-    this.worked.set('');
-    this.failed.set('');
-    this.next.set('');
-    this.body.set('');
     this.durationError.set('');
-    this.ui.sessionDraft.set('');
+    this.drafts.clear();
     this.ui.summaryLogId.set(null);
   }
 }

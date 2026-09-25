@@ -300,6 +300,7 @@ export function defaultMeta(): IMeta {
     courseVersion: null,
     dismissedCourseKeys: [],
     courseBannerDismissed: null,
+    sessionDraft: null,
   };
 }
 

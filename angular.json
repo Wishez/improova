@@ -29,7 +29,7 @@
                 "input": "public"
               },
               {
-                "glob": "{play,minus,pause,square,check,x,plus,trash-2,pencil,calendar-days,list-tree,book-open,chart-column,settings,notebook-pen,sun,chevron-down,chevron-left,chevron-right,grip-vertical,pin,skip-forward,arrow-right,maximize-2,minimize-2,image,download,upload,clock,flame,target,search,archive,undo-2,sparkles,timer,layers,link,external-link,ellipsis,circle-help,check-check,flag,coffee,refresh-cw,eye,eye-off,bell,volume-2,library}.svg",
+                "glob": "{play,minus,pause,square,check,x,plus,trash-2,pencil,calendar-days,list-tree,book-open,chart-column,settings,notebook-pen,sun,chevron-down,chevron-left,chevron-right,grip-vertical,pin,skip-forward,arrow-right,maximize-2,minimize-2,image,download,upload,clock,flame,target,search,archive,undo-2,sparkles,timer,layers,link,external-link,ellipsis,circle-help,check-check,flag,coffee,refresh-cw,eye,eye-off,bell,volume-2,library,bold,italic,heading,list,list-checks,quote,skip-back,compass}.svg",
                 "input": "node_modules/@taiga-ui/icons/src",
                 "output": "assets/taiga-ui/icons"
               }

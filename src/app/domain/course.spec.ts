@@ -7,7 +7,6 @@ import {
   quarterOfWeek,
   routeFocus,
   routeTitle,
-  scaleSteps,
   sectionWeightIn,
   validateGuide,
 } from './course';
@@ -51,22 +50,6 @@ describe('маршрут по мастерам (FR-39, US-11)', () => {
   it('неделя вне маршрута — художник по выбору (негативный)', () => {
     expect(routeFocus(blocks(), 60)).toBeNull();
     expect(routeTitle({ title: 'Изучение двух художников', routeRole: 'study' }, null)).toBe('Изучение художника по выбору');
-  });
-});
-
-describe('шаги ориентира в таймере (FR-38, US-10)', () => {
-  const steps = [
-    { title: 'Построение', minutes: 20 },
-    { title: 'Тени', minutes: 10 },
-    { title: 'Моделировка', minutes: 60 },
-  ];
-  it('90 → 20/10/60, 45 → 10/5/30', () => {
-    expect(scaleSteps(steps, 90)).toEqual([20, 10, 60]);
-    expect(scaleSteps(steps, 45)).toEqual([10, 5, 30]);
-  });
-  it('сумма после округления равна длине блока', () => {
-    const scaled = scaleSteps(steps, 50);
-    expect(scaled.reduce((sum, value) => sum + value, 0)).toBe(50);
   });
 });
 

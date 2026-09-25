@@ -15,22 +15,20 @@
     <div class="dlg__grid">
       <label class="field">
         <span class="field__label">Что получилось</span>
-        <textarea class="input" rows="2" [value]="worked()" (input)="worked.set(text($event))"></textarea>
+        <textarea class="input" rows="2" [value]="draft().worked" (input)="edit('worked', text($event))" (blur)="drafts.flush()"></textarea>
       </label>
       <label class="field">
         <span class="field__label">Что нет</span>
-        <textarea class="input" rows="2" [value]="failed()" (input)="failed.set(text($event))"></textarea>
+        <textarea class="input" rows="2" [value]="draft().failed" (input)="edit('failed', text($event))" (blur)="drafts.flush()"></textarea>
       </label>
     </div>
     <label class="field">
       <span class="field__label">Задача на следующую сессию</span>
-      <input class="input" type="text" [value]="next()" (input)="next.set(text($event))" />
+      <input class="input" type="text" [value]="draft().next" (input)="edit('next', text($event))" (blur)="drafts.flush()" />
       <span class="field__hint">Покажем при следующем старте этого топика</span>
     </label>
-    <label class="field">
-      <span class="field__label">Конспект</span>
-      <textarea class="input" rows="3" [value]="body()" (input)="body.set(text($event))"></textarea>
-    </label>
+    <app-markdown-editor [rows]="5" [split]="false" [value]="draft().body" (valueChange)="edit('body', $event)" (committed)="drafts.flush()" />
+    <span class="field__hint" aria-live="polite">{{ drafts.saving() ? 'Сохраняем черновик…' : 'Черновик сохранён — переживёт перезагрузку' }}</span>
     @if (canClose()) {
       <label class="dlg__check">
         <input tuiCheckbox type="checkbox" size="m" [ngModel]="done()" (ngModelChange)="done.set(!done())" />

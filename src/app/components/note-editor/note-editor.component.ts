@@ -1,16 +1,14 @@
 import { ChangeDetectionStrategy, Component, DestroyRef, computed, effect, inject, input, signal } from '@angular/core';
 import { TuiButton } from '@taiga-ui/core';
-import { MarkdownPipe } from '../../pipes';
-import { DataStore, MAX_PHOTOS, NotesService } from '../../services';
+import { DRAFT_SAVE_MS, DataStore, MAX_PHOTOS, NotesService } from '../../services';
+import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.component';
 
 type TNoteField = 'body' | 'worked' | 'failed' | 'next';
 
-const AUTOSAVE_MS = 800;
-
-/** Редактор заметки: markdown, рефлексия, фото, автосохранение 800 мс (FR-15, FR-17). */
+/** Редактор заметки: markdown с просмотром, рефлексия, фото, автосохранение через 1 с (FR-15, FR-17). */
 @Component({
   selector: 'app-note-editor',
-  imports: [TuiButton, MarkdownPipe],
+  imports: [TuiButton, MarkdownEditorComponent],
   templateUrl: './note-editor.component.html',
   styleUrl: './note-editor.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -23,7 +21,6 @@ export class NoteEditorComponent {
 
   protected readonly note = computed(() => this.store.data().notes.find((entry) => entry.id === this.noteId()) ?? null);
   protected readonly draft = signal<Record<TNoteField, string>>({ body: '', worked: '', failed: '', next: '' });
-  protected readonly preview = signal(false);
   protected readonly dirty = signal(false);
   protected readonly maxPhotos = MAX_PHOTOS;
   protected readonly saveState = computed(() => (this.dirty() || this.store.unsaved() > 0 ? 'Сохраняем…' : 'Сохранено'));
@@ -45,23 +42,38 @@ export class NoteEditorComponent {
       if (note && note.id !== this.loadedId) {
         this.loadedId = note.id;
         this.draft.set({ body: note.body, worked: note.worked, failed: note.failed, next: note.next });
-        this.preview.set(note.body.trim().length > 0);
       }
     });
-    inject(DestroyRef).onDestroy(() => this.flush());
+    // Уход со страницы или перезагрузка — сохраняем сразу, не дожидаясь задержки
+    const flushNow = (): void => this.flush();
+    const onHidden = (): void => {
+      if (document.visibilityState === 'hidden') {
+        this.flush();
+      }
+    };
+    window.addEventListener('pagehide', flushNow);
+    document.addEventListener('visibilitychange', onHidden);
+    inject(DestroyRef).onDestroy(() => {
+      window.removeEventListener('pagehide', flushNow);
+      document.removeEventListener('visibilitychange', onHidden);
+      this.flush();
+    });
   }
 
   protected onInput(field: TNoteField, event: Event): void {
     const target = event.target;
-    if (!(target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement)) {
-      return;
+    if (target instanceof HTMLTextAreaElement || target instanceof HTMLInputElement) {
+      this.setField(field, target.value);
     }
-    this.draft.update((draft) => ({ ...draft, [field]: target.value }));
+  }
+
+  protected setField(field: TNoteField, value: string): void {
+    this.draft.update((draft) => ({ ...draft, [field]: value }));
     this.dirty.set(true);
     if (this.timer) {
       clearTimeout(this.timer);
     }
-    this.timer = setTimeout(() => this.flush(), AUTOSAVE_MS);
+    this.timer = setTimeout(() => this.flush(), DRAFT_SAVE_MS);
   }
 
   protected flush(): void {

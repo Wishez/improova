@@ -12,6 +12,16 @@ export interface ITimerState {
   readonly stepMinutes: readonly number[] | null;
 }
 
+/** Черновик конспекта сессии (FR-13, FR-35): переживает перезагрузку, пока итог не сохранён. */
+export interface ISessionDraft {
+  /** Лог завершённой сессии; null — сессия ещё идёт. */
+  readonly logId: string | null;
+  readonly body: string;
+  readonly worked: string;
+  readonly failed: string;
+  readonly next: string;
+}
+
 export interface ISettings {
   readonly dayBoundaryHour: number;
   /** IANA-пояс отображения; пустая строка — пояс устройства. */
@@ -47,4 +57,6 @@ export interface IMeta extends IEntity {
   readonly dismissedCourseKeys: readonly string[];
   /** Версия курса, баннер которой закрыт на «Сегодня». */
   readonly courseBannerDismissed: number | null;
+  /** Черновик конспекта текущей или только что завершённой сессии. */
+  readonly sessionDraft: ISessionDraft | null;
 }

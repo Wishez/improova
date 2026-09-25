@@ -5,8 +5,33 @@
   animation: focusIn var(--duration-slow) var(--ease-standard);
 }
 
+.focus__layout {
+  @apply grid w-full max-w-xl gap-6;
+}
+
+/* С ориентиром: сессия слева, ориентир справа на широком экране, ниже — на узком */
+.focus__layout_withGuide {
+  @apply max-w-6xl xl:grid-cols-5 xl:items-start;
+}
+
 .focus__inner {
-  @apply flex w-full max-w-xl flex-col gap-6;
+  @apply flex min-w-0 flex-col gap-6 xl:col-span-3;
+}
+
+.focus__guide {
+  @apply min-w-0 xl:sticky xl:top-0 xl:col-span-2 xl:max-h-screen xl:overflow-y-auto;
+}
+
+.focus__total {
+  @apply -mt-4 mb-0 text-center text-meta text-text-3;
+}
+
+.focus__total_over {
+  @apply font-semibold text-warning;
+}
+
+.focus__note {
+  @apply flex flex-col gap-1;
 }
 
 .focus__head {
@@ -31,10 +56,6 @@
 
 .focus__label {
   @apply text-meta text-text-3;
-}
-
-.focus__link {
-  @apply text-accent underline underline-offset-2;
 }
 
 .stepBar {

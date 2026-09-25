@@ -1,0 +1,54 @@
+@reference '../../../tailwind.css';
+
+.mdEditor {
+  @apply flex min-w-0 flex-col gap-2;
+}
+
+.mdEditor__bar {
+  @apply flex flex-wrap items-center justify-between gap-2;
+}
+
+.mdEditor__tools {
+  @apply flex flex-wrap items-center gap-0.5;
+}
+
+/* Просмотр и так рядом на широком экране — переключатель не нужен */
+.mdEditor__toggle_auto {
+  @apply lg:hidden;
+}
+
+.mdEditor__panes {
+  @apply grid gap-3;
+}
+
+.mdEditor__panes_split {
+  @apply lg:grid-cols-2;
+}
+
+.mdEditor__area {
+  @apply min-h-40 resize-y font-mono text-body;
+}
+
+.mdEditor__area_hidden {
+  @apply hidden;
+}
+
+.mdEditor__area_narrowHidden {
+  @apply hidden lg:block;
+}
+
+.mdEditor__preview {
+  @apply hidden min-h-40 overflow-y-auto rounded-control bg-surface-2 p-3;
+}
+
+.mdEditor__preview_shown {
+  @apply block;
+}
+
+.mdEditor__preview_wide {
+  @apply lg:block;
+}
+
+.mdEditor__empty {
+  @apply m-0 text-meta text-text-3;
+}

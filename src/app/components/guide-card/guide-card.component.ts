@@ -37,6 +37,8 @@ const emptyLink = (): IGuideLink => ({ title: '', url: '', locator: '', access: 
 })
 export class GuideCardComponent {
   readonly item = input.required<IItem>();
+  /** Режим фокуса (баг 4): только чтение, без шагов — они уже в таймере. */
+  readonly session = input(false);
 
   private readonly store = inject(DataStore);
   private readonly program = inject(ProgramService);

@@ -1,9 +1,10 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { scaleSteps } from '../domain';
+import { stepsTotal } from '../domain';
 import type { IGuideStep, ITimerState, TSessionType } from '../types';
 import { formatClock } from '../utils';
 import { DataStore } from './data.store';
 import { LogsService } from './logs.service';
+import { SessionDraftService } from './session-draft.service';
 import { SoundService } from './sound.service';
 import { ToastService } from './toast.service';
 import { UiStateService } from './ui-state.service';
@@ -15,19 +16,52 @@ export interface IPhase {
 }
 
 export const STEP_EXTEND_MIN = 5;
+/** Сотая доля секунды: меньше не различается глазом, больше — не теряет шаг из-за округления. */
+const STEP_EPSILON_MIN = 1 / 6000;
 
-/** Шаги ориентира вместо шаблона фаз (FR-38): расписание из таймера или масштаб под длину блока. */
-export function buildGuidePhases(params: {
-  readonly steps: readonly IGuideStep[];
-  readonly plannedMin: number;
-  readonly stepMinutes: readonly number[] | null;
-}): IPhase[] {
-  const { steps, plannedMin, stepMinutes } = params;
-  const minutes =
-    stepMinutes && stepMinutes.length === steps.length
-      ? stepMinutes
-      : scaleSteps(steps, plannedMin > 0 ? plannedMin : steps.reduce((sum, entry) => sum + entry.minutes, 0));
+/**
+ * Шаги ориентира вместо шаблона фаз (FR-38). Шаг идёт столько, сколько написано в ориентире:
+ * «3 штудии по 6 минут — 20 мин» длится 20 минут, а не сжимается под короткий блок плана.
+ * После «Следующий шаг», «Предыдущий шаг» и «+5 мин» действует расписание из таймера.
+ */
+export function buildGuidePhases(params: { readonly steps: readonly IGuideStep[]; readonly stepMinutes: readonly number[] | null }): IPhase[] {
+  const { steps, stepMinutes } = params;
+  const minutes = stepMinutes && stepMinutes.length === steps.length ? stepMinutes : steps.map((entry) => entry.minutes);
   return steps.map((entry, index) => ({ title: entry.title, hint: '', minutes: minutes[index] ?? entry.minutes }));
+}
+
+/** Минута, на которой кончается шаг index. */
+export function stepEnd(phases: readonly IPhase[], index: number): number {
+  return phases.slice(0, index + 1).reduce((sum, phase) => sum + phase.minutes, 0);
+}
+
+/**
+ * «Предыдущий шаг» (баг 3): прошлый шаг снова активен и получает недобранное время, минимум 5 мин;
+ * текущий шаг не теряет своих минут и начнётся заново после прошлого.
+ */
+export function stepBack(params: {
+  readonly minutes: readonly number[];
+  readonly planned: readonly number[];
+  readonly index: number;
+  readonly elapsedMin: number;
+}): number[] {
+  const { planned, index, elapsedMin } = params;
+  const minutes = [...params.minutes];
+  if (index < 1 || index >= minutes.length) {
+    return minutes;
+  }
+  const start = minutes.slice(0, index).reduce((sum, value) => sum + value, 0);
+  const spentInCurrent = Math.max(0, elapsedMin - start);
+  const previous = minutes[index - 1] ?? 0;
+  const give = Math.max(STEP_EXTEND_MIN, (planned[index - 1] ?? 0) - previous);
+  minutes[index - 1] = previous + spentInCurrent + give;
+  // Время, которое «Следующий шаг» отдал последнему шагу, возвращается обратно
+  const last = minutes.length - 1;
+  if (last !== index - 1) {
+    const surplus = Math.max(0, (minutes[last] ?? 0) - (planned[last] ?? 0));
+    minutes[last] = (minutes[last] ?? 0) - Math.min(surplus, give);
+  }
+  return minutes;
 }
 
 /** Шаблон 90-минутной сессии (ТЗ M3): масштабируется под длину блока. */
@@ -64,10 +98,13 @@ export class TimerService {
   private readonly sound = inject(SoundService);
   private readonly toasts = inject(ToastService);
   private readonly ui = inject(UiStateService);
+  private readonly draft = inject(SessionDraftService);
 
   private readonly tick = signal(Date.now());
   private lastPhaseIndex = -1;
   private deepLimitNotified = false;
+  /** Длина сессии, о конце которой уже сообщили; +5 мин сдвигает конец и разрешает новое уведомление. */
+  private endNotifiedAt: number | null = null;
 
   readonly state = computed(() => this.store.meta().timer);
   readonly running = computed(() => this.state() !== null);
@@ -91,8 +128,15 @@ export class TimerService {
     const timer = this.state();
     const steps = this.guideSteps();
     return steps
-      ? buildGuidePhases({ steps, plannedMin: timer?.plannedMin ?? 0, stepMinutes: timer?.stepMinutes ?? null })
+      ? buildGuidePhases({ steps, stepMinutes: timer?.stepMinutes ?? null })
       : buildPhases(timer?.plannedMin ?? 0);
+  });
+  /** Длина сессии в минутах: сумма шагов ориентира или план блока. */
+  readonly totalMin = computed(() => {
+    if (this.guideSteps()) {
+      return this.phases().reduce((sum, phase) => sum + phase.minutes, 0);
+    }
+    return this.state()?.plannedMin ?? 0;
   });
   readonly phaseIndex = computed(() => {
     if (!this.guideSteps() && !this.store.settings().phases) {
@@ -103,7 +147,8 @@ export class TimerService {
     const phases = this.phases();
     for (let index = 0; index < phases.length; index += 1) {
       passed += phases[index]?.minutes ?? 0;
-      if (minutes < passed) {
+      // Допуск на дробную арифметику: граница после «Следующий шаг» ровно равна прошедшему времени
+      if (minutes < passed - STEP_EPSILON_MIN) {
         return index;
       }
     }
@@ -142,10 +187,21 @@ export class TimerService {
       }
       if (this.lastPhaseIndex !== -1 && index !== this.lastPhaseIndex && index >= 0) {
         const phase = this.phases()[index];
-        this.sound.chime();
-        this.sound.notify(`${this.guideSteps() ? 'Шаг' : 'Фаза'}: ${phase?.title ?? ''}`);
+        this.alert({ text: `${this.guideSteps() ? 'Шаг' : 'Фаза'}: ${phase?.title ?? ''}`, final: false });
       }
       this.lastPhaseIndex = index;
+    });
+    // Время сессии вышло (баг 5): звук, системное уведомление в фоне и тост со «Стоп» на экране
+    effect(() => {
+      const total = this.totalMin();
+      if (!this.running()) {
+        this.endNotifiedAt = null;
+        return;
+      }
+      if (total > 0 && this.endNotifiedAt !== total && this.elapsed() >= total * 60_000 && !this.paused()) {
+        this.endNotifiedAt = total;
+        this.alert({ text: `Время сессии вышло: ${Math.round(total)} мин. Закончи или добавь 5 минут.`, final: true });
+      }
     });
     effect(() => {
       if (this.running() && !this.deepLimitNotified && this.elapsedMin() >= DEEP_WORK_LIMIT_MIN) {
@@ -173,6 +229,10 @@ export class TimerService {
       return false;
     }
     this.sound.requestPermission();
+    // С ориентиром длина сессии — сумма его шагов: шаги идут по своим минутам (баг 1)
+    const guide = params.itemId ? this.store.data().items.find((item) => item.id === params.itemId)?.guide : null;
+    const plannedMin = guide && guide.steps.length > 0 ? stepsTotal(guide) : params.plannedMin;
+    this.draft.clear();
     this.store.updateMeta({
       timer: {
         itemId: params.itemId,
@@ -180,7 +240,7 @@ export class TimerService {
         startedAt: new Date().toISOString(),
         pausedAt: null,
         pausedMs: 0,
-        plannedMin: params.plannedMin,
+        plannedMin,
         stepMinutes: null,
       },
     });
@@ -214,6 +274,8 @@ export class TimerService {
 
   /** «Следующий шаг»: остаток текущего шага уходит в последний, длина блока не меняется (US-10). */
   nextStep(): void {
+    // Считаем от текущего момента, а не от последнего тика: иначе граница шага отстаёт до секунды
+    this.tick.set(Date.now());
     const timer = this.state();
     const index = this.phaseIndex();
     const minutes = this.phases().map((phase) => phase.minutes);
@@ -230,8 +292,28 @@ export class TimerService {
     this.store.updateMeta({ timer: { ...timer, stepMinutes: minutes } });
   }
 
+  /** «Предыдущий шаг»: вернуться к прошлому шагу ориентира, сессия удлиняется на возвращённое время. */
+  prevStep(): void {
+    this.tick.set(Date.now());
+    const timer = this.state();
+    const steps = this.guideSteps();
+    const index = this.phaseIndex();
+    if (!timer || !steps || index < 1) {
+      return;
+    }
+    const minutes = stepBack({
+      minutes: this.phases().map((phase) => phase.minutes),
+      planned: steps.map((entry) => entry.minutes),
+      index,
+      elapsedMin: this.elapsed() / 60_000,
+    });
+    const total = minutes.reduce((sum, value) => sum + value, 0);
+    this.store.updateMeta({ timer: { ...timer, stepMinutes: minutes, plannedMin: Math.max(timer.plannedMin, Math.ceil(total)) } });
+  }
+
   /** «+5 мин» к текущему шагу: блок удлиняется. */
   extendStep(): void {
+    this.tick.set(Date.now());
     const timer = this.state();
     const index = this.phaseIndex();
     if (!timer || !this.guideSteps() || index < 0) {
@@ -265,13 +347,29 @@ export class TimerService {
       endedAt: endedAt.toISOString(),
       source: 'timer',
     });
+    this.draft.attach(log.id);
     this.ui.summaryLogId.set(log.id);
     return log.id;
   }
 
   discard(): void {
     this.store.updateMeta({ timer: null });
+    this.draft.clear();
     this.ui.focusMode.set(false);
+  }
+
+  /** Сообщение таймера: на открытой вкладке — тост, в фоне — системное уведомление; звук — по настройке. */
+  private alert(params: { readonly text: string; readonly final: boolean }): void {
+    this.sound.chime();
+    const shown = this.sound.notify(params.text, { persistent: params.final });
+    if (shown) {
+      return;
+    }
+    this.toasts.show({
+      text: params.text,
+      durationMs: params.final ? 30_000 : 6000,
+      ...(params.final ? { action: { label: 'Стоп', run: () => void this.stop() } } : {}),
+    });
   }
 
   /** Переключение: остановить текущую и начать ожидающую (timer.switch). */

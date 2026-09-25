@@ -56,7 +56,12 @@ export class App {
 
   constructor() {
     // Диалог забытого таймера открываем после первой отрисовки, когда портал Taiga готов (FR-11).
-    afterNextRender(() => setTimeout(() => this.timer.checkForgotten(), 300));
+    afterNextRender(() =>
+      setTimeout(() => {
+        this.timer.checkForgotten();
+        this.restoreSummary();
+      }, 300),
+    );
     // Новая заметка из любого места (N, палитра, «Записать итог дня») открывается в ленте.
     effect(() => {
       const itemId = this.ui.newNoteForItem();
@@ -77,6 +82,14 @@ export class App {
     { path: '/stats', label: 'Статистика', icon: '@tui.chart-column' },
     { path: '/settings', label: 'Настройки', icon: '@tui.settings' },
   ];
+
+  /** Перезагрузка во время карточки итога: открываем её снова с сохранённым черновиком. */
+  private restoreSummary(): void {
+    const logId = this.store.meta().sessionDraft?.logId ?? null;
+    if (logId && this.store.data().timeLogs.some((log) => log.id === logId && !log.deletedAt)) {
+      this.ui.summaryLogId.set(logId);
+    }
+  }
 
   protected retry(): void {
     void this.store.init();

@@ -10,6 +10,7 @@ export * from './guide-card/guide-card.component';
 export * from './heatmap/heatmap.component';
 export * from './item-drawer/item-drawer.component';
 export * from './log-list/log-list.component';
+export * from './markdown-editor/markdown-editor.component';
 export * from './mini-timer/mini-timer.component';
 export * from './note-editor/note-editor.component';
 export * from './toast-host/toast-host.component';

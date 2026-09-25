@@ -4,25 +4,7 @@
       <span class="noteEditor__topic">{{ itemTitle() || 'Без топика' }}</span>
       <span class="noteEditor__state" aria-live="polite">{{ saveState() }}</span>
     </div>
-    <div class="noteEditor__bodyHead">
-      <span class="field__label">Конспект</span>
-      <button tuiButton type="button" size="xs" appearance="flat" [iconStart]="preview() ? '@tui.pencil' : '@tui.eye'" (click)="flush(); preview.set(!preview())">
-        {{ preview() ? 'Редактировать' : 'Просмотр' }}
-      </button>
-    </div>
-    @if (preview()) {
-      <div class="markdown noteEditor__preview" [innerHTML]="draft().body | markdown"></div>
-    } @else {
-      <textarea
-        class="input noteEditor__body"
-        rows="6"
-        aria-label="Конспект, поддерживается markdown"
-        placeholder="**Главное** из урока. Списки, ссылки и заголовки — в markdown."
-        [value]="draft().body"
-        (input)="onInput('body', $event)"
-        (blur)="flush()"
-      ></textarea>
-    }
+    <app-markdown-editor [split]="false" [value]="draft().body" (valueChange)="setField('body', $event)" (committed)="flush()" />
     <div class="noteEditor__grid">
       <label class="field">
         <span class="field__label">Что получилось</span>

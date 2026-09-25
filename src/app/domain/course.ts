@@ -1,4 +1,4 @@
-import type { IGuide, IGuideStep, IItem, IRouteArtist, IRouteBlock, ISection } from '../types';
+import type { IGuide, IItem, IRouteArtist, IRouteBlock, ISection } from '../types';
 import { diffDays } from '../utils';
 
 export const WEEKS_PER_QUARTER = 13;
@@ -70,26 +70,6 @@ export function routeTitle(item: Pick<IItem, 'title' | 'routeRole'>, focus: IRou
     return focus ? `Копия: ${focus.block.copyTask}` : 'Копия по выбору';
   }
   return item.title;
-}
-
-/** Пропорционально масштабирует шаги под длину блока, сумма равна plannedMin (FR-38). */
-export function scaleSteps(steps: readonly IGuideStep[], plannedMin: number): number[] {
-  const total = steps.reduce((sum, entry) => sum + entry.minutes, 0);
-  if (total <= 0 || plannedMin <= 0) {
-    return steps.map((entry) => entry.minutes);
-  }
-  const raw = steps.map((entry) => (entry.minutes / total) * plannedMin);
-  const rounded = raw.map((value) => Math.max(1, Math.floor(value)));
-  let rest = plannedMin - rounded.reduce((sum, value) => sum + value, 0);
-  const order = raw.map((value, index) => ({ index, frac: value - Math.floor(value) })).sort((a, b) => b.frac - a.frac);
-  for (let cursor = 0; rest > 0 && order.length > 0; cursor = (cursor + 1) % order.length) {
-    const target = order[cursor];
-    if (target) {
-      rounded[target.index] = (rounded[target.index] ?? 0) + 1;
-      rest -= 1;
-    }
-  }
-  return rounded;
 }
 
 export const GUIDE_LIMITS = { goal: 200, stepsMin: 1, stepsMax: 8, stepMinutesMax: 240, links: 10, references: 10, pitfalls: 5, photos: 4 } as const;

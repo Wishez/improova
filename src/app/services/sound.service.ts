@@ -29,14 +29,30 @@ export class SoundService {
     }
   }
 
-  notify(text: string): void {
+  /**
+   * Системное уведомление, когда вкладка в фоне. Возвращает true, если уведомление показано;
+   * иначе вызывающий показывает сообщение внутри приложения.
+   * persistent — конец сессии: со звуком системы и висит, пока его не закроют.
+   */
+  notify(text: string, options: { readonly persistent?: boolean } = {}): boolean {
     if (typeof Notification === 'undefined' || Notification.permission !== 'granted' || document.visibilityState === 'visible') {
-      return;
+      return false;
     }
     try {
-      new Notification('Импрува', { body: text, silent: true });
+      const notification = new Notification('Импрува', {
+        body: text,
+        silent: !options.persistent,
+        requireInteraction: options.persistent === true,
+        tag: options.persistent ? 'improva-session-end' : 'improva-step',
+      });
+      notification.onclick = () => {
+        window.focus();
+        notification.close();
+      };
+      return true;
     } catch {
       // Уведомления недоступны в этом окружении.
+      return false;
     }
   }
 

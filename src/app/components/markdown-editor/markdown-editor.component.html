@@ -1,0 +1,55 @@
+<div class="mdEditor">
+  <div class="mdEditor__bar">
+    <span class="field__label">{{ label() }}</span>
+    <div class="mdEditor__tools" role="toolbar" [attr.aria-label]="'Разметка: ' + label()">
+      @for (action of actions; track action.id) {
+        <button
+          tuiIconButton
+          type="button"
+          size="xs"
+          appearance="flat"
+          [iconStart]="action.icon"
+          [title]="action.hotkey ? action.label + ' · Ctrl+' + action.hotkey.toUpperCase() : action.label"
+          [disabled]="preview()"
+          (mousedown)="$event.preventDefault()"
+          (click)="run(action)"
+        >
+          {{ action.label }}
+        </button>
+      }
+      <button
+        tuiButton
+        type="button"
+        size="xs"
+        appearance="flat"
+        [class.mdEditor__toggle_auto]="split()"
+        [iconStart]="preview() ? '@tui.pencil' : '@tui.eye'"
+        (click)="preview.set(!preview())"
+      >
+        {{ preview() ? 'Текст' : 'Просмотр' }}
+      </button>
+    </div>
+  </div>
+  <div class="mdEditor__panes" [class.mdEditor__panes_split]="split()">
+    <textarea
+      #area
+      class="input mdEditor__area"
+      [class.mdEditor__area_hidden]="preview() && !split()"
+      [class.mdEditor__area_narrowHidden]="preview() && split()"
+      [rows]="rows()"
+      [attr.aria-label]="label() + ', поддерживается markdown'"
+      [placeholder]="placeholder()"
+      [value]="value()"
+      (input)="onInput($event)"
+      (keydown)="onKeydown($event)"
+      (blur)="committed.emit()"
+    ></textarea>
+    <div class="mdEditor__preview" [class.mdEditor__preview_shown]="preview()" [class.mdEditor__preview_wide]="split()" aria-live="polite">
+      @if (value().trim()) {
+        <div class="markdown" [innerHTML]="value() | markdown"></div>
+      } @else {
+        <p class="mdEditor__empty">Здесь появится оформленный конспект.</p>
+      }
+    </div>
+  </div>
+</div>
