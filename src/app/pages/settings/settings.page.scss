@@ -1,0 +1,81 @@
+@reference '../../../tailwind.css';
+
+.head {
+  @apply pt-2 pb-4;
+}
+
+.settings {
+  @apply grid max-w-5xl gap-4 xl:grid-cols-2;
+}
+
+.group {
+  @apply flex flex-col gap-4;
+}
+
+.group__text {
+  @apply m-0 text-body text-text-2;
+}
+
+.group__inline {
+  @apply self-start;
+}
+
+.grid2 {
+  @apply grid gap-4 md:grid-cols-2;
+}
+
+.grid3 {
+  @apply grid gap-4 md:grid-cols-3;
+}
+
+.days {
+  @apply grid grid-cols-4 gap-2 md:grid-cols-7;
+}
+
+.days__day {
+  @apply flex flex-col gap-1;
+}
+
+.days__name {
+  @apply text-meta text-text-3;
+}
+
+.days__input {
+  @apply px-2 text-center;
+}
+
+.field__hint_warn {
+  @apply text-warning;
+}
+
+.range {
+  @apply w-full accent-accent;
+}
+
+.toggle {
+  @apply flex cursor-pointer items-center gap-3 text-body text-text-1;
+}
+
+.toggle_small {
+  @apply text-meta text-text-2;
+}
+
+.tips {
+  @apply flex flex-col gap-2 pl-2;
+}
+
+.buttons {
+  @apply flex flex-wrap gap-2;
+}
+
+.buttons_end {
+  @apply justify-end;
+}
+
+.importPreview {
+  @apply flex flex-col gap-3 rounded-control bg-surface-2 p-3;
+}
+
+.dlgBody {
+  @apply flex flex-col gap-4;
+}

@@ -1,0 +1,191 @@
+<header class="head">
+  <h1 class="pageTitle">Настройки</h1>
+</header>
+
+<div class="settings">
+  <section class="card group" aria-labelledby="budget-title">
+    <h2 id="budget-title" class="card__title">Бюджет времени</h2>
+    <div class="grid2">
+      <label class="field">
+        <span class="field__label">Ресурсы, мин/нед</span>
+        <input class="input num" type="number" min="0" max="6000" step="10" [class.input_invalid]="errors()['studyMinPerWeek']" [value]="budget().studyMinPerWeek" (change)="setMinutes('studyMinPerWeek', $event)" />
+        @if (errors()['studyMinPerWeek']) {
+          <span class="field__error" role="alert">{{ errors()['studyMinPerWeek'] }}</span>
+        }
+      </label>
+      <label class="field">
+        <span class="field__label">Практика, мин/нед</span>
+        <input class="input num" type="number" min="0" max="6000" step="10" [class.input_invalid]="errors()['practiceMinPerWeek']" [value]="budget().practiceMinPerWeek" (change)="setMinutes('practiceMinPerWeek', $event)" />
+        <span class="field__hint">Включает творчество и повторения (до 25 %)</span>
+        @if (errors()['practiceMinPerWeek']) {
+          <span class="field__error" role="alert">{{ errors()['practiceMinPerWeek'] }}</span>
+        }
+      </label>
+    </div>
+    <label class="field">
+      <span class="field__label">Доля свободного творчества в практике — {{ (budget().creativeShare * 100).toFixed(0) }} % ≈ {{ creativeMin() | minutes }}</span>
+      <input class="range" type="range" min="0" max="50" step="5" [value]="budget().creativeShare * 100" (change)="setCreative($event)" />
+    </label>
+    <div class="field">
+      <span class="field__label">Ёмкость дней, мин</span>
+      <div class="days">
+        @for (name of weekdays; track name; let index = $index) {
+          <label class="days__day">
+            <span class="days__name">{{ name }}</span>
+            <input class="input num days__input" type="number" min="0" max="720" step="10" [attr.aria-label]="name + ', минут'" [value]="budget().dayCapacity[index]" (change)="setDay(index, $event)" />
+          </label>
+        }
+      </div>
+      @if (errors()['days']) {
+        <span class="field__error" role="alert">{{ errors()['days'] }}</span>
+      }
+      <span class="field__hint num" [class.field__hint_warn]="capacityTotal() < wanted()">
+        Свободно {{ capacityTotal() | minutes }}, в бюджете {{ wanted() | minutes }}{{ capacityTotal() < wanted() ? ' — план уменьшится пропорционально' : '' }}
+      </span>
+    </div>
+    <div class="grid3">
+      <label class="field">
+        <span class="field__label">Мин. блок, мин</span>
+        <input class="input num" type="number" min="10" max="180" step="5" [value]="budget().blockMin" (change)="setBlock('blockMin', $event)" />
+      </label>
+      <label class="field">
+        <span class="field__label">Макс. блок, мин</span>
+        <input class="input num" type="number" min="10" max="180" step="5" [value]="budget().blockMax" (change)="setBlock('blockMax', $event)" />
+      </label>
+      <label class="field">
+        <span class="field__label">Повторения через, дней</span>
+        <input class="input num" type="text" inputmode="numeric" [value]="budget().reviewIntervals.join(', ')" (change)="setIntervals($event)" />
+      </label>
+    </div>
+    @if (errors()['blocks'] || errors()['intervals']) {
+      <span class="field__error" role="alert">{{ errors()['blocks'] || errors()['intervals'] }}</span>
+    }
+  </section>
+
+  <section class="card group" aria-labelledby="challenge-title">
+    <h2 id="challenge-title" class="card__title">Челлендж</h2>
+    <label class="field">
+      <span class="field__label">Название</span>
+      <input class="input" type="text" [value]="challenge().title" (change)="setTitle($event)" />
+    </label>
+    <div class="grid2">
+      <label class="field">
+        <span class="field__label">Начало</span>
+        <input class="input" type="date" [value]="challenge().startDate" (change)="setChallengeDate('startDate', $event)" />
+      </label>
+      <label class="field">
+        <span class="field__label">Окончание</span>
+        <input class="input" type="date" [value]="challenge().endDate" (change)="setChallengeDate('endDate', $event)" />
+      </label>
+    </div>
+    @if (errors()['challenge']) {
+      <span class="field__error" role="alert">{{ errors()['challenge'] }}</span>
+    }
+    <button tuiButton type="button" size="xs" appearance="flat" class="group__inline" (click)="extendChallenge(4)">Продлить на 4 недели</button>
+    <div class="grid2">
+      <label class="field">
+        <span class="field__label">Граница дня, час</span>
+        <input class="input num" type="number" min="0" max="12" [value]="settings().dayBoundaryHour" (change)="setBoundary($event)" />
+        <span class="field__hint">Сессия до {{ settings().dayBoundaryHour }}:00 считается за прошлый день</span>
+      </label>
+      <label class="field">
+        <span class="field__label">Часовой пояс</span>
+        <select class="input" (change)="setTimeZone($event)">
+          <option value="" [selected]="settings().timeZone === ''">Как на устройстве ({{ deviceZone }})</option>
+          @for (zone of timeZones; track zone) {
+            <option [value]="zone" [selected]="settings().timeZone === zone">{{ zone }}</option>
+          }
+        </select>
+        <span class="field__hint">Время хранится в UTC, показывается в этом поясе</span>
+      </label>
+      <label class="field">
+        <span class="field__label">День обзора недели</span>
+        <select class="input" (change)="setReviewDay($event)">
+          @for (name of weekdays; track name; let index = $index) {
+            <option [value]="index" [selected]="settings().reviewWeekday === index">{{ name }}</option>
+          }
+        </select>
+      </label>
+    </div>
+  </section>
+
+  <section class="card group" aria-labelledby="session-title">
+    <h2 id="session-title" class="card__title">Сессии и подсказки</h2>
+    <label class="toggle">
+      <input tuiSwitch type="checkbox" size="s" [ngModel]="settings().phases" (ngModelChange)="store.updateSettings({ phases: !settings().phases })" />
+      <span>Фазы сессии: разминка → отработка → глубокая работа → анализ</span>
+    </label>
+    <label class="toggle">
+      <input tuiSwitch type="checkbox" size="s" [ngModel]="settings().sound" (ngModelChange)="store.updateSettings({ sound: !settings().sound })" />
+      <span>Тихий звук при смене фазы и на 90-й минуте</span>
+    </label>
+    @if (notifications() === 'default') {
+      <button tuiButton type="button" size="xs" appearance="flat" class="group__inline" iconStart="@tui.bell" (click)="requestNotifications()">Разрешить системные уведомления</button>
+    } @else if (notifications() === 'denied') {
+      <span class="field__hint">Уведомления запрещены в браузере — останется звук.</span>
+    }
+    <label class="toggle">
+      <input tuiSwitch type="checkbox" size="s" [ngModel]="settings().tipsEnabled" (ngModelChange)="store.updateSettings({ tipsEnabled: !settings().tipsEnabled })" />
+      <span>Подсказки о методиках обучения</span>
+    </label>
+    @if (settings().tipsEnabled) {
+      <div class="tips">
+        @for (tip of tipToggles; track tip.id) {
+          <label class="toggle toggle_small">
+            <input tuiSwitch type="checkbox" size="s" [ngModel]="!settings().disabledTips.includes(tip.id)" (ngModelChange)="toggleTip(tip.id)" />
+            <span>{{ tip.label }}</span>
+          </label>
+        }
+      </div>
+    }
+  </section>
+
+  <section class="card group" aria-labelledby="data-title">
+    <h2 id="data-title" class="card__title">Данные</h2>
+    <p class="group__text">
+      Данные хранятся в этом браузере (IndexedDB) и работают без сети.
+      @if (backup.usage(); as usage) {
+        Занято {{ formatBytes(usage.usedBytes) }} из {{ formatBytes(usage.quotaBytes) }}.
+      }
+    </p>
+    <div class="buttons">
+      <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.download" (click)="backup.exportFull()">Скачать копию (JSON)</button>
+      <button tuiButton type="button" size="s" appearance="flat" (click)="backup.exportProgram()">Программа (JSON)</button>
+      <button tuiButton type="button" size="s" appearance="flat" (click)="backup.exportCsv()">Логи (CSV)</button>
+      <label tuiButton appearance="flat" size="s" iconStart="@tui.upload">
+        Импорт из файла
+        <input class="visuallyHidden" type="file" accept="application/json,.json" (change)="onImportFile($event)" />
+      </label>
+    </div>
+    @if (importError()) {
+      <p class="field__error" role="alert">{{ importError() }}</p>
+    }
+    @if (importCheck(); as check) {
+      <div class="importPreview">
+        @if (check.snapshot.kind === 'program') {
+          <p class="group__text">Шаблон программы: добавится {{ check.preview.added }} записей как новые разделы и ресурсы. Текущие данные не изменятся.</p>
+          <div class="buttons">
+            <button tuiButton type="button" size="s" appearance="flat" (click)="importCheck.set(null)">Отмена</button>
+            <button tuiButton type="button" size="s" (click)="applyImport(check.snapshot, 'merge')">Импортировать</button>
+          </div>
+        } @else {
+          <p class="group__text">Объединение: будет добавлено {{ check.preview.added }}, обновлено {{ check.preview.updated }}. Остальные данные не изменятся.</p>
+          <div class="buttons">
+            <button tuiButton type="button" size="s" appearance="flat" (click)="importCheck.set(null)">Отмена</button>
+            <button tuiButton type="button" size="s" appearance="flat" (click)="replaceConfirm.set(true)">Заменить все данные</button>
+            <button tuiButton type="button" size="s" (click)="applyImport(check.snapshot, 'merge')">Объединить</button>
+          </div>
+        }
+      </div>
+      <ng-template [tuiDialog]="replaceConfirm()" [tuiDialogOptions]="{ label: 'Заменить все данные?', size: 's' }" (tuiDialogChange)="replaceConfirm.set($event)">
+        <div class="dlgBody">
+          <p class="group__text">Текущие данные — {{ check.logs }} сессий и {{ check.notes }} заметок — будут удалены. Перед заменой скачается их копия.</p>
+          <div class="buttons buttons_end">
+            <button tuiButton type="button" size="m" appearance="flat" (click)="replaceConfirm.set(false)">Оставить как есть</button>
+            <button tuiButton type="button" size="m" (click)="applyImport(check.snapshot, 'replace')">Заменить данные</button>
+          </div>
+        </div>
+      </ng-template>
+    }
+  </section>
+</div>
