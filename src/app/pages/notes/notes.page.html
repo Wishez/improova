@@ -1,0 +1,97 @@
+<header class="head">
+  <h1 class="pageTitle">Заметки</h1>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'feed'" [attr.aria-selected]="tab() === 'feed'" (click)="tab.set('feed')">Лента</button>
+    <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'gallery'" [attr.aria-selected]="tab() === 'gallery'" (click)="tab.set('gallery')">Было / стало</button>
+  </div>
+</header>
+
+@if (tab() === 'feed') {
+  <div class="toolbar">
+    <input class="input toolbar__search" type="search" placeholder="Поиск по тексту" aria-label="Поиск по тексту заметок" [value]="query()" (input)="query.set(text($event))" />
+    <select class="input toolbar__section" aria-label="Раздел" (change)="sectionId.set(text($event))">
+      <option value="">Все разделы</option>
+      @for (section of sections(); track section.id) {
+        <option [value]="section.id">{{ section.title }}</option>
+      }
+    </select>
+    <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.plus" class="toolbar__new" (click)="create()">Написать заметку</button>
+  </div>
+
+  <ul class="feed">
+    @for (note of notes(); track note.id) {
+      <li class="note" [id]="'note-' + note.id" [class.note_open]="openId() === note.id">
+        @if (openId() === note.id) {
+          <div class="note__editHead">
+            <select class="input note__link" aria-label="Топик заметки" (change)="link(note, $event)">
+              <option value="" [selected]="!note.itemId">Без топика</option>
+              @for (item of items(); track item.id) {
+                <option [value]="item.id" [selected]="note.itemId === item.id">{{ item.title }}</option>
+              }
+            </select>
+            <button tuiButton type="button" size="xs" appearance="flat" (click)="toggle(note)">Свернуть</button>
+          </div>
+          <app-note-editor [noteId]="note.id" />
+          <div class="note__footer">
+            <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.trash-2" (click)="remove(note)">Удалить заметку</button>
+          </div>
+        } @else {
+          <button type="button" class="note__preview" (click)="toggle(note)">
+            <span class="note__meta">
+              <span class="num">{{ note.createdAt.slice(0, 10) | dayShort }}</span>
+              <span class="note__topic">{{ titleOf(note) }}</span>
+              @if (note.imageIds.length > 0) {
+                <span class="note__photos">{{ note.imageIds.length }} фото</span>
+              }
+            </span>
+            <span class="markdown note__text" [innerHTML]="preview(note) | markdown"></span>
+          </button>
+        }
+      </li>
+    } @empty {
+      @if (query() || sectionId()) {
+        <li>
+          <app-empty-state
+            [title]="query() ? 'По запросу «' + query() + '» заметок нет' : 'В этом разделе заметок нет'"
+            body="Проверь написание или выбери другой раздел."
+            cta="Сбросить поиск"
+            (action)="query.set(''); sectionId.set('')"
+          />
+        </li>
+      } @else {
+        <li>
+          <app-empty-state
+            title="Здесь будут конспекты"
+            body="Заметка появляется после сессии или из карточки топика. Короткий конспект помогает повторять по памяти."
+            cta="Написать заметку"
+            (action)="create()"
+          />
+        </li>
+      }
+    }
+  </ul>
+} @else {
+  <div class="gallery">
+    @for (entry of gallery(); track entry.topicId) {
+      <article class="card compareCard">
+        <h2 class="compareCard__title">{{ entry.title }}</h2>
+        <div class="compareCard__pair">
+          <figure class="compareCard__item">
+            <img class="compareCard__img" [src]="entry.first.asset.dataUrl" alt="Первая работа по теме" loading="lazy" />
+            <figcaption class="compareCard__caption">Было · {{ entry.first.day | dayShort }}</figcaption>
+          </figure>
+          @if (entry.last; as last) {
+            <figure class="compareCard__item">
+              <img class="compareCard__img" [src]="last.asset.dataUrl" alt="Последняя работа по теме" loading="lazy" />
+              <figcaption class="compareCard__caption">Стало · {{ last.day | dayShort }}</figcaption>
+            </figure>
+          } @else {
+            <p class="compareCard__wait">Сравнение появится, когда в теме будет два фото из разных дней.</p>
+          }
+        </div>
+      </article>
+    } @empty {
+      <app-empty-state title="Фото пока нет" body="Добавь фото работы в заметку — из них соберётся «Было / стало» по теме." />
+    }
+  </div>
+}

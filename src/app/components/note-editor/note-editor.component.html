@@ -1,0 +1,60 @@
+@if (note(); as current) {
+  <div class="noteEditor">
+    <div class="noteEditor__head">
+      <span class="noteEditor__topic">{{ itemTitle() || 'Без топика' }}</span>
+      <span class="noteEditor__state" aria-live="polite">{{ saveState() }}</span>
+    </div>
+    <div class="noteEditor__bodyHead">
+      <span class="field__label">Конспект</span>
+      <button tuiButton type="button" size="xs" appearance="flat" [iconStart]="preview() ? '@tui.pencil' : '@tui.eye'" (click)="flush(); preview.set(!preview())">
+        {{ preview() ? 'Редактировать' : 'Просмотр' }}
+      </button>
+    </div>
+    @if (preview()) {
+      <div class="markdown noteEditor__preview" [innerHTML]="draft().body | markdown"></div>
+    } @else {
+      <textarea
+        class="input noteEditor__body"
+        rows="6"
+        aria-label="Конспект, поддерживается markdown"
+        placeholder="**Главное** из урока. Списки, ссылки и заголовки — в markdown."
+        [value]="draft().body"
+        (input)="onInput('body', $event)"
+        (blur)="flush()"
+      ></textarea>
+    }
+    <div class="noteEditor__grid">
+      <label class="field">
+        <span class="field__label">Что получилось</span>
+        <textarea class="input" rows="2" [value]="draft().worked" (input)="onInput('worked', $event)" (blur)="flush()"></textarea>
+      </label>
+      <label class="field">
+        <span class="field__label">Что нет</span>
+        <textarea class="input" rows="2" [value]="draft().failed" (input)="onInput('failed', $event)" (blur)="flush()"></textarea>
+      </label>
+    </div>
+    <label class="field">
+      <span class="field__label">Задача на следующую сессию</span>
+      <input class="input" type="text" [value]="draft().next" (input)="onInput('next', $event)" (blur)="flush()" />
+    </label>
+    <div class="photos">
+      @for (photo of photos(); track photo.id) {
+        <figure class="photos__item">
+          <img class="photos__img" [src]="photo.dataUrl" [attr.width]="photo.width" [attr.height]="photo.height" alt="Фото работы" loading="lazy" />
+          <button tuiIconButton type="button" size="xs" appearance="secondary" iconStart="@tui.x" class="photos__remove" (click)="notes.removePhoto(current.id, photo.id)">
+            Удалить фото
+          </button>
+        </figure>
+      }
+      @if (current.imageIds.length < maxPhotos) {
+        <label class="photos__add" [class.photos__add_busy]="notes.uploading()">
+          <span>{{ notes.uploading() ? 'Сжимаем…' : '+ Фото работы' }}</span>
+          <input class="visuallyHidden" type="file" accept="image/*" multiple (change)="onFiles($event)" />
+        </label>
+      }
+    </div>
+    @if (photos().length === 0) {
+      <p class="field__hint">Добавь фото работы — из них соберётся «Было / стало» по теме. До {{ maxPhotos }} фото.</p>
+    }
+  </div>
+}

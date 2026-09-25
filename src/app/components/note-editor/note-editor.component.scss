@@ -1,0 +1,54 @@
+@reference '../../../tailwind.css';
+
+.noteEditor {
+  @apply flex flex-col gap-4;
+}
+
+.noteEditor__head,
+.noteEditor__bodyHead {
+  @apply flex items-center justify-between gap-3;
+}
+
+.noteEditor__topic {
+  @apply truncate text-body font-semibold text-text-1;
+}
+
+.noteEditor__state {
+  @apply shrink-0 text-meta text-text-3;
+}
+
+.noteEditor__body {
+  @apply min-h-36;
+}
+
+.noteEditor__preview {
+  @apply min-h-16 rounded-control bg-surface-2 p-3;
+}
+
+.noteEditor__grid {
+  @apply grid gap-4 md:grid-cols-2;
+}
+
+.photos {
+  @apply flex flex-wrap gap-3;
+}
+
+.photos__item {
+  @apply relative m-0 h-24 w-24 overflow-hidden rounded-control bg-surface-2;
+}
+
+.photos__img {
+  @apply h-full w-full object-cover;
+}
+
+.photos__remove {
+  @apply absolute top-1 right-1;
+}
+
+.photos__add {
+  @apply flex h-24 w-24 cursor-pointer items-center justify-center rounded-control border border-dashed border-border-control text-center text-meta text-text-2 transition-colors duration-(--duration-fast) hover:border-accent hover:text-accent;
+}
+
+.photos__add_busy {
+  @apply cursor-wait opacity-60;
+}

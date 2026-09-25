@@ -1,0 +1,109 @@
+@reference '../../../tailwind.css';
+
+.head {
+  @apply flex flex-wrap items-center justify-between gap-4 pt-2 pb-4;
+}
+
+.tabs {
+  @apply flex gap-1 rounded-control bg-surface-1 p-1;
+}
+
+.tabs__tab {
+  @apply cursor-pointer rounded-control border-0 bg-transparent px-4 py-1.5 text-body text-text-2 transition-colors duration-(--duration-fast) hover:text-text-1;
+}
+
+.tabs__tab_active {
+  @apply bg-surface-3 text-text-1;
+}
+
+.toolbar {
+  @apply mb-4 flex flex-wrap items-center gap-3;
+}
+
+.toolbar__search {
+  @apply w-full md:w-72;
+}
+
+.toolbar__section {
+  @apply w-full md:w-56;
+}
+
+.toolbar__new {
+  @apply md:ml-auto;
+}
+
+.feed {
+  @apply m-0 flex max-w-3xl list-none flex-col gap-2 p-0;
+}
+
+.note {
+  @apply rounded-card bg-surface-1 transition-colors duration-(--duration-base);
+}
+
+.note_open {
+  @apply flex flex-col gap-3 p-4 ring-1 ring-border-control;
+}
+
+.note__preview {
+  @apply flex w-full cursor-pointer flex-col gap-1.5 rounded-card border-0 bg-transparent px-4 py-3 text-left hover:bg-surface-2;
+}
+
+.note__meta {
+  @apply flex items-center gap-3 text-meta text-text-3;
+}
+
+.note__topic {
+  @apply truncate text-text-2;
+}
+
+.note__photos {
+  @apply ml-auto shrink-0;
+}
+
+.note__text {
+  @apply line-clamp-3;
+}
+
+.note__editHead {
+  @apply flex items-center gap-2;
+}
+
+.note__link {
+  @apply py-1 text-meta;
+}
+
+.note__footer {
+  @apply flex justify-end border-t border-border pt-2;
+}
+
+.gallery {
+  @apply grid gap-4 md:grid-cols-2 xl:grid-cols-3;
+}
+
+.compareCard {
+  @apply flex flex-col gap-3;
+}
+
+.compareCard__title {
+  @apply m-0 text-lead font-semibold;
+}
+
+.compareCard__pair {
+  @apply grid grid-cols-2 gap-3;
+}
+
+.compareCard__item {
+  @apply m-0 flex flex-col gap-1;
+}
+
+.compareCard__img {
+  @apply aspect-square w-full rounded-control object-cover;
+}
+
+.compareCard__caption {
+  @apply text-meta text-text-3;
+}
+
+.compareCard__wait {
+  @apply m-0 self-center text-meta text-text-3;
+}
