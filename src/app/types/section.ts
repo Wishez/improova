@@ -11,4 +11,6 @@ export interface ISection extends IEntity {
   readonly archived: boolean;
   /** Веса по кварталам Q1–Q4 (FR-40); null — вес на весь год. */
   readonly quarterWeights: readonly TSectionWeight[] | null;
+  /** Ключ курса (FR-44): стабильный идентификатор стартовой сущности; null — своя. */
+  readonly courseKey: string | null;
 }

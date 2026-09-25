@@ -3,8 +3,7 @@ import { TuiButton } from '@taiga-ui/core';
 import { ANALYSIS_QUESTIONS, EMPTY_GUIDE, GUIDE_LIMITS, stepsTotal, validateGuide, type TGuideField } from '../../domain';
 import { CourseService, DataStore, ProgramService } from '../../services';
 import type { IGuide, IGuideLink, IGuideStep, IItem, TLinkAccess } from '../../types';
-
-export const ACCESS_LABEL: Record<TLinkAccess, string> = { pd: 'общественное достояние', free: 'бесплатно', paid: 'платно' };
+import { ACCESS_LABEL } from '../../utils';
 
 interface IGuideDraft {
   goal: string;
@@ -44,6 +43,11 @@ export class GuideCardComponent {
   private readonly course = inject(CourseService);
 
   protected readonly accessLabel = ACCESS_LABEL;
+  /** Правки ориентира нестартового топика курса заменятся при обновлении курса (FR-44). */
+  protected readonly courseHint = computed(() => {
+    const item = this.item();
+    return item.courseKey !== null && item.doneAt === null && (this.store.spent().get(item.id) ?? 0) === 0;
+  });
   protected readonly questions = ANALYSIS_QUESTIONS;
   protected readonly limits = GUIDE_LIMITS;
   protected readonly editing = signal(false);

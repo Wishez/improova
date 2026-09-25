@@ -5,6 +5,7 @@ import {
   emptyCollections,
   mergeEntities,
   type IStorageAdapter,
+  type IWriteBatch,
   type TImportMode,
 } from './storage-adapter';
 
@@ -45,6 +46,28 @@ export class MemoryAdapter implements IStorageAdapter {
     if (index >= 0) {
       list.splice(index, 1);
     }
+    return Promise.resolve();
+  }
+
+  async writeBatch(batch: IWriteBatch): Promise<void> {
+    const next = structuredClone(this.data);
+    for (const { collection, entity } of batch.puts) {
+      const list: IEntity[] = next[collection];
+      const index = list.findIndex((existing) => existing.id === entity.id);
+      if (index >= 0) {
+        list[index] = structuredClone(entity);
+      } else {
+        list.push(structuredClone(entity));
+      }
+    }
+    for (const { collection, id } of batch.removes) {
+      const list: IEntity[] = next[collection];
+      const index = list.findIndex((existing) => existing.id === id);
+      if (index >= 0) {
+        list.splice(index, 1);
+      }
+    }
+    this.data = next;
     return Promise.resolve();
   }
 

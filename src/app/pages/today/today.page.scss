@@ -248,3 +248,11 @@
 .tip__actions {
   @apply flex gap-2;
 }
+
+.courseBanner {
+  @apply mb-4 motion-safe:animate-[fadeIn_200ms_ease-out];
+}
+
+.courseBanner__actions {
+  @apply flex flex-wrap gap-2;
+}

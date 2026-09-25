@@ -35,6 +35,9 @@
 
   @if (editing()) {
     <form class="guideForm" novalidate (submit)="$event.preventDefault(); save()">
+      @if (courseHint()) {
+        <p class="field__hint">Топик из курса: при обновлении курса правки заменятся, пока топик не начат.</p>
+      }
       <label class="field">
         <span class="field__label">Цель — что умеешь после топика</span>
         <input class="input" type="text" [maxLength]="limits.goal" [value]="draft().goal" (input)="patch({ goal: text($event) })" />

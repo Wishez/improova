@@ -1,6 +1,6 @@
 import { Injectable, inject } from '@angular/core';
 import { GUIDE_LIMITS, estimateFromResource } from '../domain';
-import { buildSeed } from '../seed';
+import { COURSE_VERSION, buildSeed } from '../seed';
 import type { IAsset, IGuide, IItem, IResource, ISection, ITopic, TItemKind, TSectionWeight } from '../types';
 import { compressImage, createId } from '../utils';
 import { DataStore } from './data.store';
@@ -46,6 +46,7 @@ export class ProgramService {
     this.store.upsertMany('topics', seed.topics);
     this.store.upsertMany('items', seed.items);
     this.store.upsertMany('routeBlocks', seed.routeBlocks);
+    this.store.updateMeta({ courseVersion: COURSE_VERSION, dismissedCourseKeys: [] });
   }
 
   addSection(title: string): ISection {
@@ -61,6 +62,7 @@ export class ProgramService {
       weight: 2,
       quarterWeights: null,
       archived: false,
+      courseKey: null,
     };
     this.store.upsert('sections', section);
     return section;
@@ -78,6 +80,7 @@ export class ProgramService {
       description: '',
       order: nextOrder(siblings),
       archived: false,
+      courseKey: null,
     };
     this.store.upsert('topics', topic);
     return topic;
@@ -104,6 +107,9 @@ export class ProgramService {
       archived: false,
       guide: null,
       routeRole: null,
+      courseKey: null,
+      courseHash: null,
+      checkpointDay: null,
     }));
     this.store.upsertMany('items', items);
     return items;
@@ -222,6 +228,7 @@ export class ProgramService {
     this.store.remove('timeLogs', removed.timeLogs.map((e) => e.id));
     this.store.remove('notes', removed.notes.map((e) => e.id));
     this.store.remove('planBlocks', removed.planBlocks.map((e) => e.id));
+    const dismissedBefore = this.dismissCourseKeys([...removed.sections, ...removed.topics, ...removed.items]);
     const label = entity === 'section' ? 'Раздел удалён' : entity === 'topic' ? 'Тема удалена' : 'Топик удалён';
     this.toasts.undo({
       text: label,
@@ -232,13 +239,14 @@ export class ProgramService {
         this.store.upsertMany('timeLogs', removed.timeLogs);
         this.store.upsertMany('notes', removed.notes);
         this.store.upsertMany('planBlocks', removed.planBlocks);
+        this.store.updateMeta({ dismissedCourseKeys: dismissedBefore });
       },
     });
   }
 
-  addResource(draft: Omit<IResource, 'id' | 'createdAt' | 'updatedAt' | 'archived'>): IResource {
+  addResource(draft: Omit<IResource, 'id' | 'createdAt' | 'updatedAt' | 'archived' | 'courseKey'>): IResource {
     const now = this.now();
-    const resource: IResource = { ...draft, id: createId(), createdAt: now, updatedAt: now, archived: false };
+    const resource: IResource = { ...draft, id: createId(), createdAt: now, updatedAt: now, archived: false, courseKey: null };
     this.store.upsert('resources', resource);
     return resource;
   }
@@ -259,6 +267,7 @@ export class ProgramService {
     const affected = data.items.filter((item) => item.resourceRefs.some((ref) => ref.resourceId === id));
     const now = this.now();
     this.store.remove('resources', [id]);
+    const dismissedBefore = this.dismissCourseKeys([resource]);
     this.store.upsertMany(
       'items',
       affected.map((item) => ({ ...item, resourceRefs: item.resourceRefs.filter((ref) => ref.resourceId !== id), updatedAt: now })),
@@ -268,6 +277,7 @@ export class ProgramService {
       onUndo: () => {
         this.store.upsert('resources', resource);
         this.store.upsertMany('items', affected);
+        this.store.updateMeta({ dismissedCourseKeys: dismissedBefore });
       },
     });
   }
@@ -306,10 +316,23 @@ export class ProgramService {
         archived: false,
         guide: null,
         routeRole: null,
+        courseKey: null,
+        courseHash: null,
+        checkpointDay: null,
       };
     });
     this.store.upsertMany('items', items);
     return items.length;
+  }
+
+  /** Удалённая стартовая сущность не возвращается обновлением курса (FR-44). Возвращает прежний список для отмены. */
+  dismissCourseKeys(entities: readonly { readonly courseKey: string | null }[]): readonly string[] {
+    const before = this.store.meta().dismissedCourseKeys;
+    const keys = entities.map((entity) => entity.courseKey).filter((key): key is string => key !== null);
+    if (keys.length > 0) {
+      this.store.updateMeta({ dismissedCourseKeys: [...new Set([...before, ...keys])] });
+    }
+    return before;
   }
 
   // ——— Ориентир топика (FR-37) ———

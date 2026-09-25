@@ -141,7 +141,7 @@ export class BackupService {
   }
 }
 
-/** Программа-шаблон получает новые id, чтобы не пересекаться с текущей (ТЗ 8.2). */
+/** Программа-шаблон получает новые id и становится своей: курс её не обновляет (ТЗ 8.2, FR-44). */
 function withFreshIds(snapshot: ISnapshot, skipRoute: boolean): ISnapshot {
   const ids = new Map<string, string>();
   const fresh = (id: string): string => {
@@ -157,16 +157,18 @@ function withFreshIds(snapshot: ISnapshot, skipRoute: boolean): ISnapshot {
   return {
     ...snapshot,
     data: {
-      resources: (data.resources ?? []).map((entry) => ({ ...entry, id: fresh(entry.id) })),
-      sections: (data.sections ?? []).map((entry) => ({ ...entry, id: fresh(entry.id) })),
-      topics: (data.topics ?? []).map((entry) => ({ ...entry, id: fresh(entry.id), sectionId: fresh(entry.sectionId) })),
+      resources: (data.resources ?? []).map((entry) => ({ ...entry, id: fresh(entry.id), courseKey: null })),
+      sections: (data.sections ?? []).map((entry) => ({ ...entry, id: fresh(entry.id), courseKey: null })),
+      topics: (data.topics ?? []).map((entry) => ({ ...entry, id: fresh(entry.id), sectionId: fresh(entry.sectionId), courseKey: null })),
       items: (data.items ?? []).map((entry) => ({
         ...entry,
         id: fresh(entry.id),
         topicId: fresh(entry.topicId),
         resourceRefs: entry.resourceRefs.map((ref) => ({ ...ref, resourceId: fresh(ref.resourceId) })),
+        courseKey: null,
+        courseHash: null,
       })),
-      routeBlocks: skipRoute ? [] : (data.routeBlocks ?? []).map((entry) => ({ ...entry, id: fresh(entry.id) })),
+      routeBlocks: skipRoute ? [] : (data.routeBlocks ?? []).map((entry) => ({ ...entry, id: fresh(entry.id), courseKey: null })),
     },
   };
 }

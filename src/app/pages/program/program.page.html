@@ -19,6 +19,13 @@
       }
     </tui-segmented>
     <input class="input toolbar__search" type="search" placeholder="Поиск по названию" aria-label="Поиск по названию" [value]="query()" (input)="query.set(text($event))" />
+    @if (withCourse()) {
+      <select class="input toolbar__origin" aria-label="Происхождение" (change)="setOrigin($event)">
+        <option value="all" [selected]="origin() === 'all'">Все</option>
+        <option value="course" [selected]="origin() === 'course'">Из курса</option>
+        <option value="custom" [selected]="origin() === 'custom'">Свои</option>
+      </select>
+    }
     <div class="toolbar__actions">
       <button tuiButton type="button" size="s" appearance="flat" (click)="expandAll(true)">Развернуть все</button>
       <button tuiButton type="button" size="s" appearance="flat" (click)="expandAll(false)">Свернуть все</button>
@@ -37,7 +44,7 @@
       [title]="query() ? 'По запросу «' + query() + '» ничего нет' : 'Под фильтр ничего не попало'"
       [body]="query() ? 'Проверь написание.' : 'Топиков со статусом «' + filters[filterIndex()]?.label + '» нет.'"
       cta="Сбросить фильтр"
-      (action)="filter.set('all'); query.set('')"
+      (action)="filter.set('all'); query.set(''); origin.set('all')"
     />
   }
 
@@ -55,6 +62,9 @@
             <input class="input section__rename" type="text" aria-label="Название раздела" [value]="section.title" (keydown.enter)="commitRename('section', section.id, $event)" (keydown.escape)="editing.set(null)" (blur)="commitRename('section', section.id, $event)" />
           } @else {
             <button type="button" class="section__title" (click)="toggle(section.id)" (dblclick)="editing.set({ kind: 'section', id: section.id })">{{ section.title }}</button>
+          }
+          @if (withCourse() && section.courseKey === null) {
+            <span class="tag">своё</span>
           }
           <div class="progressMini">
             <span class="progressMini__track"><span class="progressMini__fill" [class]="'progressMini__fill progressMini__fill_' + section.colorToken" [style.transform]="'scaleX(' + sectionView.progress.ratio + ')'"></span></span>
@@ -92,6 +102,9 @@
                       <button type="button" class="topic__title" [class.topic__title_done]="topicView.progress.status === 'done'" (click)="toggle(topic.id)" (dblclick)="editing.set({ kind: 'topic', id: topic.id })">
                         {{ topic.title }}
                       </button>
+                    }
+                    @if (withCourse() && topic.courseKey === null) {
+                      <span class="tag">своё</span>
                     }
                     @if (topicView.progress.status === 'done') {
                       <span class="topic__closed">закрыта</span>
@@ -147,6 +160,12 @@
                               >
                                 {{ item.title }}
                               </button>
+                            }
+                            @if (withCourse() && item.courseKey === null) {
+                              <span class="tag">своё</span>
+                            }
+                            @if (item.checkpointDay !== null) {
+                              <span class="chip">контрольная · день {{ item.checkpointDay }}</span>
                             }
                             @if (item.weakSpot) {
                               <span class="chip chip_weak">слабое место</span>

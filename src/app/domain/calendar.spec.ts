@@ -33,6 +33,7 @@ const route: IRouteBlock = {
   ],
   copyTask: 'Кисть',
   copyTechnique: 'Лайнер',
+  courseKey: null,
   links: [],
 };
 

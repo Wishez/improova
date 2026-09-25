@@ -29,4 +29,10 @@ export interface IItem extends IEntity {
   readonly archived: boolean;
   readonly guide: IGuide | null;
   readonly routeRole: TRouteRole | null;
+  /** Ключ курса (FR-44): стабильный идентификатор стартовой сущности; null — своя. */
+  readonly courseKey: string | null;
+  /** Отпечаток полей курса при последней синхронизации: отличие от текущих полей — правки пользователя. */
+  readonly courseHash: string | null;
+  /** День челленджа контрольной работы (FR-41); null — обычный топик. */
+  readonly checkpointDay: number | null;
 }

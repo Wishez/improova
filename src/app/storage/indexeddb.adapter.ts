@@ -6,6 +6,7 @@ import {
   emptyCollections,
   mergeEntities,
   type IStorageAdapter,
+  type IWriteBatch,
   type TImportMode,
 } from './storage-adapter';
 
@@ -57,6 +58,19 @@ export class IndexedDbAdapter implements IStorageAdapter {
 
   async remove(collection: TCollection, id: string): Promise<void> {
     await this.db().delete(collection, id);
+  }
+
+  async writeBatch(batch: IWriteBatch): Promise<void> {
+    const stores = [...new Set([...batch.puts.map((entry) => entry.collection), ...batch.removes.map((entry) => entry.collection)])];
+    if (stores.length === 0) {
+      return;
+    }
+    const transaction = this.db().transaction(stores, 'readwrite');
+    await Promise.all([
+      ...batch.puts.map((entry) => transaction.objectStore(entry.collection).put(entry.entity)),
+      ...batch.removes.map((entry) => transaction.objectStore(entry.collection).delete(entry.id)),
+      transaction.done,
+    ]);
   }
 
   async exportAll(): Promise<ISnapshot> {

@@ -1,3 +1,5 @@
+import { assignCourseKeys } from '../domain';
+import { COURSE } from '../seed';
 import type { ICollections, IGuide, IGuideLink, IRouteArtist, ISnapshot, TCollection, TSnapshotKind } from '../types';
 import { COLLECTIONS, SCHEMA_VERSION } from './storage-adapter';
 
@@ -27,8 +29,9 @@ const RULES: Record<TCollection, Record<string, TFieldRule>> = {
     weight: 'number',
     archived: 'boolean',
     quarterWeights: 'array?',
+    courseKey: 'string?',
   },
-  topics: { ...BASE, sectionId: 'string', title: 'string', description: 'string', order: 'number', archived: 'boolean' },
+  topics: { ...BASE, sectionId: 'string', title: 'string', description: 'string', order: 'number', archived: 'boolean', courseKey: 'string?' },
   items: {
     ...BASE,
     topicId: 'string',
@@ -44,6 +47,9 @@ const RULES: Record<TCollection, Record<string, TFieldRule>> = {
     archived: 'boolean',
     guide: 'object?',
     routeRole: 'string?',
+    courseKey: 'string?',
+    courseHash: 'string?',
+    checkpointDay: 'number?',
   },
   resources: {
     ...BASE,
@@ -55,6 +61,9 @@ const RULES: Record<TCollection, Record<string, TFieldRule>> = {
     unitCount: 'number',
     minPerUnit: 'number',
     archived: 'boolean',
+    access: 'string?',
+    freeAlternativeUrl: 'string?',
+    courseKey: 'string?',
   },
   planBlocks: {
     ...BASE,
@@ -86,7 +95,18 @@ const RULES: Record<TCollection, Record<string, TFieldRule>> = {
     imageIds: 'array',
   },
   assets: { ...BASE, dataUrl: 'string', width: 'number', height: 'number', bytes: 'number' },
-  meta: { ...BASE, onboarded: 'boolean', settings: 'object', tips: 'object', milestonesShown: 'array', expanded: 'array', dayPlans: 'object?' },
+  meta: {
+    ...BASE,
+    onboarded: 'boolean',
+    settings: 'object',
+    tips: 'object',
+    milestonesShown: 'array',
+    expanded: 'array',
+    dayPlans: 'object?',
+    courseVersion: 'number?',
+    dismissedCourseKeys: 'array?',
+    courseBannerDismissed: 'number?',
+  },
   routeBlocks: {
     ...BASE,
     order: 'number',
@@ -96,6 +116,7 @@ const RULES: Record<TCollection, Record<string, TFieldRule>> = {
     copyTask: 'string',
     copyTechnique: 'string',
     links: 'array',
+    courseKey: 'string?',
   },
 };
 
@@ -108,6 +129,7 @@ const ENUMS: Partial<Record<string, readonly string[]>> = {
   'resources.type': ['book', 'course', 'video', 'article', 'exercise', 'tool'],
   'resources.unit': ['page', 'lesson', 'minute', 'piece'],
   'items.routeRole': ['study', 'copy'],
+  'resources.access': ['pd', 'free', 'paid'],
 };
 
 const isStringArray = (value: unknown): value is readonly string[] =>
@@ -166,6 +188,8 @@ const DEEP: Partial<Record<string, (value: unknown) => boolean>> = {
   'sections.quarterWeights': (value) => value === null || value === undefined || isQuarterWeights(value),
   'routeBlocks.artists': (value) => Array.isArray(value) && value.every(isRouteArtist),
   'routeBlocks.links': (value) => Array.isArray(value) && value.every(isGuideLink),
+  'meta.dismissedCourseKeys': (value) => value === null || value === undefined || isStringArray(value),
+  'items.checkpointDay': (value) => value === null || value === undefined || (typeof value === 'number' && Number.isInteger(value) && value >= 1),
 };
 
 export type TSnapshotCheck =
@@ -259,26 +283,68 @@ export function checkSnapshot(text: string): TSnapshotCheck {
 }
 
 /**
- * Приводит данные к текущей схеме. Миграция 1 → 2 только добавляет поля со значениями
- * по умолчанию, ничего не удаляет, поэтому обратима экспортом (ТЗ 1.2, FR-42).
+ * Приводит данные к текущей схеме. Миграции только добавляют поля со значениями по умолчанию,
+ * ничего не удаляют (ТЗ 1.2 FR-42, 1.3 FR-44). Данные без версии курса (до 1.3) получают ключи
+ * курса по совпадению пути названий с курсом.
  */
 function normalizePartial(data: Partial<ICollections>): Partial<ICollections> {
   const next: Partial<ICollections> = { ...data };
   if (data.items) {
-    next.items = data.items.map((item) => ({ ...item, guide: item.guide ?? null, routeRole: item.routeRole ?? null }));
+    next.items = data.items.map((item) => ({
+      ...item,
+      guide: item.guide ?? null,
+      routeRole: item.routeRole ?? null,
+      courseKey: item.courseKey ?? null,
+      courseHash: item.courseHash ?? null,
+      checkpointDay: item.checkpointDay ?? null,
+    }));
   }
   if (data.sections) {
-    next.sections = data.sections.map((section) => ({ ...section, quarterWeights: section.quarterWeights ?? null }));
+    next.sections = data.sections.map((section) => ({ ...section, quarterWeights: section.quarterWeights ?? null, courseKey: section.courseKey ?? null }));
+  }
+  if (data.topics) {
+    next.topics = data.topics.map((topic) => ({ ...topic, courseKey: topic.courseKey ?? null }));
+  }
+  if (data.resources) {
+    next.resources = data.resources.map((resource) => ({
+      ...resource,
+      access: resource.access ?? 'paid',
+      freeAlternativeUrl: resource.freeAlternativeUrl ?? '',
+      courseKey: resource.courseKey ?? null,
+    }));
+  }
+  if (data.routeBlocks) {
+    next.routeBlocks = data.routeBlocks.map((block) => ({ ...block, courseKey: block.courseKey ?? null }));
   }
   if (data.budgets) {
     // Для данных v1 квартальные веса выключены: поведение планировщика не меняется
     next.budgets = data.budgets.map((budget) => ({ ...budget, seasonalWeights: budget.seasonalWeights ?? false }));
   }
   if (data.meta) {
+    const legacy = data.meta.some((meta) => !('courseVersion' in meta));
+    let courseVersion: number | null = null;
+    if (legacy) {
+      const assigned = assignCourseKeys(
+        {
+          sections: next.sections ?? [],
+          topics: next.topics ?? [],
+          items: next.items ?? [],
+          resources: next.resources ?? [],
+          routeBlocks: next.routeBlocks ?? [],
+        },
+        COURSE,
+      );
+      Object.assign(next, assigned.data);
+      // Курс релиза 1.2 — версия 1
+      courseVersion = assigned.matched > 0 ? 1 : null;
+    }
     next.meta = data.meta.map((meta) => ({
       ...meta,
       timer: meta.timer ? { ...meta.timer, stepMinutes: meta.timer.stepMinutes ?? null } : null,
       dayPlans: meta.dayPlans ?? {},
+      courseVersion: 'courseVersion' in meta ? meta.courseVersion : courseVersion,
+      dismissedCourseKeys: meta.dismissedCourseKeys ?? [],
+      courseBannerDismissed: meta.courseBannerDismissed ?? null,
     }));
   }
   return next;
@@ -288,7 +354,7 @@ export function normalizeCollections(data: ICollections): ICollections {
   return { ...data, ...normalizePartial(data) };
 }
 
-/** Цепочка миграций схемы; версия 2 — текущая. */
+/** Цепочка миграций схемы; версия 3 — текущая. */
 export function migrate(snapshot: ISnapshot): ISnapshot {
   return { ...snapshot, schemaVersion: SCHEMA_VERSION, data: normalizePartial(snapshot.data) };
 }

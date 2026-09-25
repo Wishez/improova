@@ -1,7 +1,10 @@
-import type { IGuide, IGuideLink, IGuideStep, IRouteArtist, TItemKind, TResourceType, TResourceUnit, TRouteRole, TSectionWeight } from '../types';
+import type { IGuide, IGuideLink, IGuideStep, IRouteArtist, TItemKind, TLinkAccess, TResourceType, TResourceUnit, TRouteRole, TSectionWeight } from '../types';
 import { L } from './course-links';
 
-/** Стартовая программа v2 (ТЗ 9, FR-42): ориентиры по документу курса. Описание без id — id выдаются при создании. */
+/**
+ * Курс годового челленджа (ТЗ 9, FR-42, FR-44). Описание без id — id выдаются при создании.
+ * Ключ курса по умолчанию — путь названий; при переименовании задай `key` со старым путём (AGENTS.md).
+ */
 
 export interface ISeedResource {
   readonly key: string;
@@ -12,9 +15,12 @@ export interface ISeedResource {
   readonly unit: TResourceUnit;
   readonly unitCount: number;
   readonly minPerUnit: number;
+  readonly access: TLinkAccess;
+  readonly freeAlternativeUrl?: string;
 }
 
 export interface ISeedItem {
+  readonly key?: string;
   readonly title: string;
   readonly kind: TItemKind;
   readonly estimateMin: number;
@@ -24,15 +30,18 @@ export interface ISeedItem {
   readonly selfCheck?: string;
   readonly guide: IGuide;
   readonly routeRole?: TRouteRole;
+  readonly checkpointDay?: number;
 }
 
 export interface ISeedTopic {
+  readonly key?: string;
   readonly title: string;
   readonly description: string;
   readonly items: readonly ISeedItem[];
 }
 
 export interface ISeedSection {
+  readonly key?: string;
   readonly title: string;
   readonly weight: TSectionWeight;
   readonly quarterWeights: readonly TSectionWeight[];
@@ -40,6 +49,7 @@ export interface ISeedSection {
 }
 
 export interface ISeedRouteBlock {
+  readonly key?: string;
   readonly fromWeek: number;
   readonly toWeek: number;
   readonly artists: readonly IRouteArtist[];
@@ -48,26 +58,26 @@ export interface ISeedRouteBlock {
 }
 
 export const SEED_RESOURCES: readonly ISeedResource[] = [
-  { key: 'drawabox', title: 'Drawabox', type: 'course', author: 'Uncomfortable', url: 'https://drawabox.com', unit: 'lesson', unitCount: 7, minPerUnit: 60 },
-  { key: 'proko', title: 'Figure Drawing Fundamentals', type: 'course', author: 'Proko', url: 'https://www.proko.com/course/figure-drawing-fundamentals', unit: 'lesson', unitCount: 57, minPerUnit: 20 },
-  { key: 'loa', title: 'Line of Action', type: 'tool', author: 'Line of Action', url: 'https://line-of-action.com', unit: 'minute', unitCount: 0, minPerUnit: 1 },
-  { key: 'willkemp', title: 'Will Kemp Art School', type: 'video', author: 'Will Kemp', url: 'https://willkempartschool.com', unit: 'minute', unitCount: 180, minPerUnit: 1.5 },
-  { key: 'bauman', title: 'Stephen Bauman — YouTube', type: 'video', author: 'Stephen Bauman', url: 'https://www.youtube.com/c/stephenbaumanartwork/videos', unit: 'minute', unitCount: 80, minPerUnit: 1.5 },
-  { key: 'farges', title: 'Практический гид по масляной живописи', type: 'article', author: 'Florent Farges', url: 'https://www.florentfarges.com/the-practical-guide-to-oil-painting-techniques/', unit: 'minute', unitCount: 120, minPerUnit: 1 },
-  { key: 'bucci', title: '10 Minutes to Better Painting', type: 'video', author: 'Marco Bucci', url: 'https://www.youtube.com/playlist?list=PL2MPJVby8-FVNcT35aKv6Ha30lwVYyK8G', unit: 'minute', unitCount: 80, minPerUnit: 1.5 },
-  { key: 'munsell', title: 'Munsell Color Science for Painters', type: 'article', author: 'Munsell Color Science for Painters', url: 'https://www.munsellcolorscienceforpainters.com', unit: 'minute', unitCount: 120, minPerUnit: 1 },
-  { key: 'zorn', title: 'Цветовая сетка палитры Цорна', type: 'exercise', author: 'Artists & Illustrators', url: 'https://www.artistsandillustrators.co.uk/how-to/art-theory/how-to-make-a-colour-chart-using-the-zorn-palette/', unit: 'piece', unitCount: 1, minPerUnit: 180 },
-  { key: 'usk', title: 'Urban Sketchers', type: 'tool', author: 'Urban Sketchers', url: 'http://urbansketchers.org/who-we-are/', unit: 'minute', unitCount: 0, minPerUnit: 1 },
-  { key: 'gac', title: 'Google Arts & Culture', type: 'tool', author: 'Google', url: 'https://artsandculture.google.com', unit: 'minute', unitCount: 0, minPerUnit: 1 },
-  { key: 'li', title: 'Основы учебного академического рисунка', type: 'book', author: 'Николай Ли', url: 'https://www.labirint.ru/books/142012/', unit: 'page', unitCount: 480, minPerUnit: 4 },
-  { key: 'bargue', title: 'Charles Bargue: Drawing Course', type: 'book', author: 'Gerald M. Ackerman', url: 'https://www.waterstones.com/book/charles-bargue-drawing-course/gerald-m-ackerman/graydon-parrish/9782867702037', unit: 'piece', unitCount: 197, minPerUnit: 90 },
-  { key: 'loomis', title: 'Successful Drawing', type: 'book', author: 'Andrew Loomis', url: 'https://titanbooks.com/5916-successful-drawing/', unit: 'page', unitCount: 160, minPerUnit: 4 },
-  { key: 'norling', title: 'Perspective Made Easy', type: 'book', author: 'Ernest Norling', url: 'https://www.abebooks.com/9780486404738/Perspective-Made-Easy-Dover-Art-0486404730/plp', unit: 'page', unitCount: 203, minPerUnit: 4 },
-  { key: 'robertson', title: 'How to Draw', type: 'book', author: 'Scott Robertson', url: 'https://designstudiopress.com/products/how-to-draw', unit: 'page', unitCount: 208, minPerUnit: 4 },
-  { key: 'gurney', title: 'Color and Light', type: 'book', author: 'James Gurney', url: 'https://publishing.andrewsmcmeel.com/book/color-and-light/', unit: 'page', unitCount: 224, minPerUnit: 4 },
-  { key: 'framedink', title: 'Framed Ink', type: 'book', author: 'Marcos Mateu-Mestre', url: 'https://designstudiopress.com/products/framed-ink', unit: 'page', unitCount: 144, minPerUnit: 4 },
-  { key: 'ching', title: 'Architecture: Form, Space, and Order', type: 'book', author: 'Francis D. K. Ching', url: 'https://www.wiley.com/en-se/Architecture:+Form,+Space,+and+Order,+5th+Edition-p-9781119853374', unit: 'page', unitCount: 480, minPerUnit: 4 },
-  { key: 'schmid', title: 'Alla Prima II', type: 'book', author: 'Richard Schmid', url: 'https://www.amazon.com/Alla-Prima-II-Everything-Painting/dp/096621174X', unit: 'page', unitCount: 150, minPerUnit: 4 },
+  { key: 'drawabox', title: 'Drawabox', type: 'course', author: 'Uncomfortable', url: 'https://drawabox.com', unit: 'lesson', unitCount: 7, minPerUnit: 60, access: 'free' },
+  { key: 'proko', title: 'Figure Drawing Fundamentals', type: 'course', author: 'Proko', url: 'https://www.proko.com/course/figure-drawing-fundamentals', unit: 'lesson', unitCount: 57, minPerUnit: 20, access: 'paid', freeAlternativeUrl: L.proko.url },
+  { key: 'loa', title: 'Line of Action', type: 'tool', author: 'Line of Action', url: 'https://line-of-action.com', unit: 'minute', unitCount: 0, minPerUnit: 1, access: 'free' },
+  { key: 'willkemp', title: 'Will Kemp Art School', type: 'video', author: 'Will Kemp', url: 'https://willkempartschool.com', unit: 'minute', unitCount: 180, minPerUnit: 1.5, access: 'free' },
+  { key: 'bauman', title: 'Stephen Bauman — YouTube', type: 'video', author: 'Stephen Bauman', url: 'https://www.youtube.com/c/stephenbaumanartwork/videos', unit: 'minute', unitCount: 80, minPerUnit: 1.5, access: 'free' },
+  { key: 'farges', title: 'Практический гид по масляной живописи', type: 'article', author: 'Florent Farges', url: 'https://www.florentfarges.com/the-practical-guide-to-oil-painting-techniques/', unit: 'minute', unitCount: 120, minPerUnit: 1, access: 'free' },
+  { key: 'bucci', title: '10 Minutes to Better Painting', type: 'video', author: 'Marco Bucci', url: 'https://www.youtube.com/playlist?list=PL2MPJVby8-FVNcT35aKv6Ha30lwVYyK8G', unit: 'minute', unitCount: 80, minPerUnit: 1.5, access: 'free' },
+  { key: 'munsell', title: 'Munsell Color Science for Painters', type: 'article', author: 'Munsell Color Science for Painters', url: 'https://www.munsellcolorscienceforpainters.com', unit: 'minute', unitCount: 120, minPerUnit: 1, access: 'free' },
+  { key: 'zorn', title: 'Цветовая сетка палитры Цорна', type: 'exercise', author: 'Artists & Illustrators', url: 'https://www.artistsandillustrators.co.uk/how-to/art-theory/how-to-make-a-colour-chart-using-the-zorn-palette/', unit: 'piece', unitCount: 1, minPerUnit: 180, access: 'free' },
+  { key: 'usk', title: 'Urban Sketchers', type: 'tool', author: 'Urban Sketchers', url: 'http://urbansketchers.org/who-we-are/', unit: 'minute', unitCount: 0, minPerUnit: 1, access: 'free' },
+  { key: 'gac', title: 'Google Arts & Culture', type: 'tool', author: 'Google', url: 'https://artsandculture.google.com', unit: 'minute', unitCount: 0, minPerUnit: 1, access: 'free' },
+  { key: 'li', title: 'Основы учебного академического рисунка', type: 'book', author: 'Николай Ли', url: 'https://www.labirint.ru/books/142012/', unit: 'page', unitCount: 480, minPerUnit: 4, access: 'paid', freeAlternativeUrl: L.vanderpoel.url },
+  { key: 'bargue', title: 'Charles Bargue: Drawing Course', type: 'book', author: 'Gerald M. Ackerman', url: 'https://www.waterstones.com/book/charles-bargue-drawing-course/gerald-m-ackerman/graydon-parrish/9782867702037', unit: 'piece', unitCount: 197, minPerUnit: 90, access: 'paid', freeAlternativeUrl: L.bargue.url },
+  { key: 'loomis', title: 'Successful Drawing', type: 'book', author: 'Andrew Loomis', url: 'https://titanbooks.com/5916-successful-drawing/', unit: 'page', unitCount: 160, minPerUnit: 4, access: 'paid', freeAlternativeUrl: L.speed.url },
+  { key: 'norling', title: 'Perspective Made Easy', type: 'book', author: 'Ernest Norling', url: 'https://www.abebooks.com/9780486404738/Perspective-Made-Easy-Dover-Art-0486404730/plp', unit: 'page', unitCount: 203, minPerUnit: 4, access: 'paid', freeAlternativeUrl: L.norton.url },
+  { key: 'robertson', title: 'How to Draw', type: 'book', author: 'Scott Robertson', url: 'https://designstudiopress.com/products/how-to-draw', unit: 'page', unitCount: 208, minPerUnit: 4, access: 'paid', freeAlternativeUrl: L.ctrlPerspective.url },
+  { key: 'gurney', title: 'Color and Light', type: 'book', author: 'James Gurney', url: 'https://publishing.andrewsmcmeel.com/book/color-and-light/', unit: 'page', unitCount: 224, minPerUnit: 4, access: 'paid', freeAlternativeUrl: L.gurneyForm.url },
+  { key: 'framedink', title: 'Framed Ink', type: 'book', author: 'Marcos Mateu-Mestre', url: 'https://designstudiopress.com/products/framed-ink', unit: 'page', unitCount: 144, minPerUnit: 4, access: 'paid', freeAlternativeUrl: L.ctrlLibrary.url },
+  { key: 'ching', title: 'Architecture: Form, Space, and Order', type: 'book', author: 'Francis D. K. Ching', url: 'https://www.wiley.com/en-se/Architecture:+Form,+Space,+and+Order,+5th+Edition-p-9781119853374', unit: 'page', unitCount: 480, minPerUnit: 4, access: 'paid' },
+  { key: 'schmid', title: 'Alla Prima II', type: 'book', author: 'Richard Schmid', url: 'https://www.amazon.com/Alla-Prima-II-Everything-Painting/dp/096621174X', unit: 'page', unitCount: 150, minPerUnit: 4, access: 'paid', freeAlternativeUrl: L.gurneySpeed.url },
 ];
 
 type TGuideDraft = Omit<IGuide, 'stopCriterion' | 'links' | 'references' | 'imageIds' | 'pitfalls'> &
@@ -103,6 +113,15 @@ const series = (params: {
     ...(params.resource ? { resource: params.resource } : {}),
     guide: guide({ ...params.base, task }),
   }));
+
+/** Контрольные работы (FR-41): день 66 и конец каждого квартала по 13 недель. */
+const CHECKPOINTS: readonly (readonly [string, number])[] = [
+  ['день 66', 66],
+  ['конец Q1', 91],
+  ['конец Q2', 182],
+  ['конец Q3', 273],
+  ['финал', 364],
+];
 
 export const SEED_SECTIONS: readonly ISeedSection[] = [
   {
@@ -898,6 +917,25 @@ export const SEED_SECTIONS: readonly ISeedSection[] = [
             }),
           },
         ],
+      },
+      {
+        title: 'Контрольные работы',
+        description: 'Один и тот же сюжет раз в квартал: по фото контрольных видно, что изменилось за год.',
+        items: CHECKPOINTS.map(([title, day]) => ({
+          title: `Контрольная работа · ${title}`,
+          kind: 'practice' as const,
+          estimateMin: 120,
+          checkpointDay: day,
+          selfCheck: 'Что стало лучше по сравнению с прошлой контрольной — назови 3 вещи',
+          guide: guide({
+            goal: 'Зафиксировать уровень на сравнимой работе, чтобы видеть рост за год.',
+            task: 'Натюрморт из 3 предметов разной формы под одним источником света — тот же сюжет и формат A4, что в прошлый раз.',
+            steps: [step('Постановка: те же предметы и свет, фото постановки', 15), step('Композиция и построение', 25), step('Тон: 3 тональные группы, затем детали', 65), step('Фото работы при дневном свете, заметка', 15)],
+            stopCriterion: 'Фото работы и заметка «что изменилось с прошлой контрольной» сохранены.',
+            links: [L.speed, L.ctrlValue],
+            pitfalls: ['Менять сюжет или формат — сравнение потеряет смысл', 'Доделывать работу в следующий день: время — часть условия'],
+          }),
+        })),
       },
     ],
   },

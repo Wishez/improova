@@ -1,6 +1,7 @@
+import { planCourseUpdate } from '../domain';
 import type { IItem, IResource, IRouteBlock, ISection, ITopic } from '../types';
 import { createId } from '../utils';
-import { SEED_RESOURCES, SEED_ROUTE, SEED_SECTIONS } from './program.seed';
+import { COURSE } from './course';
 
 export interface ISeedResult {
   readonly sections: ISection[];
@@ -10,96 +11,22 @@ export interface ISeedResult {
   readonly routeBlocks: IRouteBlock[];
 }
 
-/** Создаёт стартовую программу с новыми id (ТЗ 9, FR-01). */
+/** Стартовая программа (ТЗ 9, FR-01): курс текущей версии, применённый к пустым данным. */
 export function buildSeed(nowIso: string): ISeedResult {
-  const base = { createdAt: nowIso, updatedAt: nowIso };
-  const resourceIds = new Map<string, string>();
-  const resources: IResource[] = SEED_RESOURCES.map((seed) => {
-    const id = createId();
-    resourceIds.set(seed.key, id);
-    return {
-      ...base,
-      id,
-      title: seed.title,
-      type: seed.type,
-      author: seed.author,
-      url: seed.url,
-      unit: seed.unit,
-      unitCount: seed.unitCount,
-      minPerUnit: seed.minPerUnit,
-      archived: false,
-    };
+  const plan = planCourseUpdate({
+    data: { sections: [], topics: [], items: [], resources: [], routeBlocks: [], timeLogs: [] },
+    course: COURSE,
+    dismissedKeys: [],
+    activeItemId: null,
+    currentWeek: 1,
+    nowIso,
+    createId: () => createId(),
   });
-  const resourceById = new Map(resources.map((resource) => [resource.id, resource]));
-
-  const sections: ISection[] = [];
-  const topics: ITopic[] = [];
-  const items: IItem[] = [];
-  SEED_SECTIONS.forEach((seedSection, sectionIndex) => {
-    const sectionId = createId();
-    sections.push({
-      ...base,
-      id: sectionId,
-      title: seedSection.title,
-      colorToken: (sectionIndex % 6) + 1,
-      order: sectionIndex,
-      weight: seedSection.weight,
-      archived: false,
-      quarterWeights: [...seedSection.quarterWeights],
-    });
-    seedSection.topics.forEach((seedTopic, topicIndex) => {
-      const topicId = createId();
-      topics.push({
-        ...base,
-        id: topicId,
-        sectionId,
-        title: seedTopic.title,
-        description: seedTopic.description,
-        order: topicIndex,
-        archived: false,
-      });
-      seedTopic.items.forEach((seedItem, itemIndex) => {
-        const resourceId = seedItem.resource ? resourceIds.get(seedItem.resource) : undefined;
-        const resource = resourceId ? resourceById.get(resourceId) : undefined;
-        items.push({
-          ...base,
-          id: createId(),
-          topicId,
-          title: seedItem.title,
-          kind: seedItem.kind,
-          estimateMin: seedItem.estimateMin,
-          resourceRefs:
-            resourceId && resource
-              ? [
-                  {
-                    resourceId,
-                    range: seedItem.range ?? '',
-                    units: resource.minPerUnit > 0 ? Math.round(seedItem.estimateMin / resource.minPerUnit) : 0,
-                  },
-                ]
-              : [],
-          weakSpot: false,
-          recurrenceWeeks: seedItem.recurrenceWeeks ?? null,
-          selfCheck: seedItem.selfCheck ?? '',
-          order: itemIndex,
-          doneAt: null,
-          archived: false,
-          guide: seedItem.guide,
-          routeRole: seedItem.routeRole ?? null,
-        });
-      });
-    });
-  });
-  const routeBlocks: IRouteBlock[] = SEED_ROUTE.map((block, index) => ({
-    ...base,
-    id: createId(),
-    order: index,
-    fromWeek: block.fromWeek,
-    toWeek: block.toWeek,
-    artists: block.artists,
-    copyTask: block.copyTask,
-    copyTechnique: block.copyTechnique,
-    links: [],
-  }));
-  return { sections, topics, items, resources, routeBlocks };
+  return {
+    sections: [...plan.puts.sections],
+    topics: [...plan.puts.topics],
+    items: [...plan.puts.items],
+    resources: [...plan.puts.resources],
+    routeBlocks: [...plan.puts.routeBlocks],
+  };
 }

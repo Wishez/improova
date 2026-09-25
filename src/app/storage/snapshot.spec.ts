@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { budgetFixture, itemFixture, logFixture } from '../domain/test-fixtures';
+import { budgetFixture, itemFixture, logFixture, sectionFixture, topicFixture } from '../domain/test-fixtures';
+import { defaultMeta } from '../services/data.store';
 import type { IItem } from '../types';
 import { MemoryAdapter } from './memory.adapter';
 import { checkSnapshot } from './snapshot';
@@ -43,11 +44,54 @@ describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
     const check = checkSnapshot(JSON.stringify(file));
     expect(check.ok).toBe(true);
     if (check.ok) {
-      expect(check.snapshot.schemaVersion).toBe(2);
+      expect(check.snapshot.schemaVersion).toBe(3);
       expect(check.snapshot.data.items?.[0]).toMatchObject({ guide: null, routeRole: null });
       expect(check.snapshot.data.budgets?.[0]?.seasonalWeights).toBe(false);
       expect(check.snapshot.data.routeBlocks).toBeUndefined();
     }
+  });
+
+  it('файл v2 мигрирует в v3: стартовые получают ключи курса по пути названий, версия курса 1 (FR-44)', () => {
+    const { courseVersion: _version, dismissedCourseKeys: _dismissed, courseBannerDismissed: _banner, ...legacyMeta } = defaultMeta();
+    const section = { ...sectionFixture('s', 0), title: 'Форма' };
+    const topic = { ...topicFixture('t', 's'), title: 'Линия и разминка' };
+    const starter = { ...itemFixture({ id: 'a', topicId: 't' }), title: 'Линии и эллипсы от плеча' };
+    const custom = { ...itemFixture({ id: 'b', topicId: 't' }), title: 'Мой топик' };
+    const strip = ({ courseKey: _key, courseHash: _hash, checkpointDay: _day, ...rest }: IItem): object => rest;
+    const file = {
+      app: 'improva',
+      kind: 'full',
+      schemaVersion: 2,
+      exportedAt: '',
+      data: { meta: [legacyMeta], sections: [section], topics: [topic], items: [strip(starter), strip(custom)] },
+    };
+    const check = checkSnapshot(JSON.stringify(file));
+    expect(check.ok).toBe(true);
+    if (check.ok) {
+      expect(check.snapshot.data.meta?.[0]).toMatchObject({ courseVersion: 1, dismissedCourseKeys: [], courseBannerDismissed: null });
+      expect(check.snapshot.data.sections?.[0]?.courseKey).toBe('section:Форма');
+      expect(check.snapshot.data.items?.find((item) => item.id === 'a')?.courseKey).toBe('item:Форма/Линия и разминка/Линии и эллипсы от плеча');
+      expect(check.snapshot.data.items?.find((item) => item.id === 'b')).toMatchObject({ courseKey: null, checkpointDay: null });
+    }
+    const empty = checkSnapshot(JSON.stringify({ ...file, data: { meta: [legacyMeta] } }));
+    expect(empty.ok && empty.snapshot.data.meta?.[0]?.courseVersion).toBeNull();
+  });
+
+  it('чужой доступ ресурса и дробный день контрольной отклоняются (негативный)', () => {
+    const resource = { id: 'r', createdAt: '', updatedAt: '', title: 'R', type: 'book', author: '', url: '', unit: 'page', unitCount: 1, minPerUnit: 1, archived: false, access: 'stolen' };
+    expect(checkSnapshot(JSON.stringify({ app: 'improva', schemaVersion: 3, data: { resources: [resource] } }))).toMatchObject({ path: 'resources[0].access' });
+    const item = { ...itemFixture({ id: 'a', topicId: 't' }), checkpointDay: 6.5 };
+    expect(checkSnapshot(JSON.stringify({ app: 'improva', schemaVersion: 3, data: { items: [item] } }))).toMatchObject({ path: 'items[0].checkpointDay' });
+  });
+
+  it('пакетная запись применяет изменения и удаления вместе (НФТ 1.3)', async () => {
+    const adapter = new MemoryAdapter();
+    await adapter.put('items', itemFixture({ id: 'old', topicId: 't' }));
+    await adapter.writeBatch({
+      puts: [{ collection: 'items', entity: itemFixture({ id: 'new', topicId: 't' }) }],
+      removes: [{ collection: 'items', id: 'old' }],
+    });
+    expect((await adapter.loadAll()).items.map((item) => item.id)).toEqual(['new']);
   });
 
   it('битый ориентир и чужая роль маршрута отклоняются с путём поля (негативный)', () => {

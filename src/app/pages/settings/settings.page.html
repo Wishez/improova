@@ -194,41 +194,123 @@
         <input class="visuallyHidden" type="file" accept="application/json,.json" (change)="onImportFile($event)" />
       </label>
     </div>
-    <div class="coursePanel">
-      <p class="group__text">
-        <strong>Ориентиры курса.</strong> Добавляет цели, шаги, ссылки и маршрут по мастерам в топики стартовой программы.
-        Заполняются только пустые ориентиры — прогресс, логи, заметки и оценки не меняются. Запуск можно повторить.
+    <section class="coursePanel" aria-labelledby="course-title">
+      <p class="group__text num">
+        <strong id="course-title">Курс.</strong>
+        @if (course.version() === null) {
+          У челленджа нет курса — в программе только свои топики. Можно добавить курс v{{ course.latestVersion }}.
+        } @else if (course.hasUpdate()) {
+          У тебя v{{ course.version() }} · доступна v{{ course.latestVersion }}.
+        } @else {
+          Курс актуален · v{{ course.version() }}.
+        }
       </p>
-      @if (coursePreview(); as preview) {
-        <p class="group__text num">
-          Будет заполнено {{ preview.matched }}, свой ориентир уже есть у {{ preview.kept }}, не найдено {{ preview.notFound.length }}.
-          @if (preview.routeBlocks > 0) {
-            Маршрут по мастерам: {{ preview.routeBlocks }} блоков.
-          }
-          @if (preview.sectionWeights > 0) {
-            Квартальные веса: {{ preview.sectionWeights }} разделов.
-          }
-        </p>
-        @if (preview.notFound.length > 0) {
-          <details class="coursePanel__missing">
-            <summary>Не найдены в программе</summary>
-            <ul>
-              @for (path of preview.notFound; track path) {
-                <li>{{ path }}</li>
+      @if (course.hasUpdate()) {
+        <details class="coursePanel__details" open>
+          <summary>Что нового</summary>
+          @for (release of course.releases(); track release.version) {
+            <p class="coursePanel__release num">v{{ release.version }} · {{ release.date | dayShort }}</p>
+            <ul class="coursePanel__list">
+              @for (note of release.notes; track note) {
+                <li>{{ note }}</li>
               }
             </ul>
-          </details>
-        }
-        <div class="buttons">
-          <button tuiButton type="button" size="s" appearance="flat" (click)="coursePreview.set(null)">Отмена</button>
-          <button tuiButton type="button" size="s" [disabled]="preview.matched + preview.routeBlocks + preview.sectionWeights === 0" (click)="applyCourse()">Добавить</button>
+          }
+        </details>
+      }
+      @if (coursePlan(); as plan) {
+        <div class="coursePlan" role="region" aria-live="polite" aria-label="Предпросмотр обновления курса">
+          @if (!plan.changed) {
+            <p class="group__text">Твоя программа уже совпадает с курсом v{{ plan.version }} — останется только отметить версию.</p>
+          } @else {
+            <ul class="coursePlan__groups num">
+              @if (plan.summary.added.length > 0) {
+                <li>
+                  <details>
+                    <summary>Добавится: {{ plan.summary.added.length }}</summary>
+                    <ul class="coursePanel__list">
+                      @for (title of plan.summary.added; track $index) {
+                        <li>{{ title }}</li>
+                      }
+                    </ul>
+                  </details>
+                </li>
+              }
+              @if (plan.summary.updated.length > 0) {
+                <li>
+                  <details>
+                    <summary>
+                      Обновится: {{ plan.summary.updated.length }}
+                      @if (plan.summary.overwritten.length > 0) {
+                        <span class="coursePlan__warn">· твои правки заменятся: {{ plan.summary.overwritten.length }}</span>
+                      }
+                    </summary>
+                    <ul class="coursePanel__list">
+                      @for (title of plan.summary.updated; track $index) {
+                        <li>{{ title }}</li>
+                      }
+                    </ul>
+                    @if (plan.summary.overwritten.length > 0) {
+                      <p class="coursePlan__warn">С твоими правками: {{ plan.summary.overwritten.join(', ') }}</p>
+                    }
+                  </details>
+                </li>
+              }
+              @if (plan.summary.archived.length > 0) {
+                <li>
+                  <details>
+                    <summary>Уйдёт в архив: {{ plan.summary.archived.length }}</summary>
+                    <ul class="coursePanel__list">
+                      @for (title of plan.summary.archived; track $index) {
+                        <li>{{ title }}</li>
+                      }
+                    </ul>
+                  </details>
+                </li>
+              }
+              <li>
+                <details>
+                  <summary>Не тронем: начатые — {{ plan.summary.keptStarted.length }}, свои — {{ plan.summary.customItems }}</summary>
+                  <ul class="coursePanel__list">
+                    @for (title of plan.summary.keptStarted; track $index) {
+                      <li>{{ title }}</li>
+                    }
+                  </ul>
+                </details>
+              </li>
+              @if (plan.summary.resources.added + plan.summary.resources.updated + plan.summary.resources.archived > 0) {
+                <li>
+                  Ресурсы: добавится {{ plan.summary.resources.added }}, обновится {{ plan.summary.resources.updated }}, в архив
+                  {{ plan.summary.resources.archived }}
+                </li>
+              }
+              @if (plan.summary.routeBlocks.added + plan.summary.routeBlocks.updated + plan.summary.routeBlocks.removed > 0) {
+                <li>
+                  Маршрут мастеров с недели {{ course.week() }}: добавится {{ plan.summary.routeBlocks.added }}, обновится
+                  {{ plan.summary.routeBlocks.updated }}, удалится {{ plan.summary.routeBlocks.removed }}
+                </li>
+              }
+            </ul>
+            <p class="field__hint">Прогресс, логи, заметки и план не меняются. После обновления его можно отменить в течение 10 секунд.</p>
+          }
+          @if (courseError()) {
+            <p class="field__error" role="alert">{{ courseError() }}</p>
+          }
+          <div class="buttons">
+            <button tuiButton type="button" size="s" appearance="flat" (click)="coursePlan.set(null)">Отмена</button>
+            <button tuiButton type="button" size="s" [disabled]="courseApplying()" (click)="applyCourse()">
+              {{ courseApplying() ? 'Обновляю…' : 'Обновить до v' + plan.version }}
+            </button>
+          </div>
         </div>
-      } @else {
+      } @else if (course.hasUpdate()) {
         <div class="buttons">
-          <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.sparkles" (click)="previewCourse()">Добавить ориентиры курса</button>
+          <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.sparkles" (click)="previewCourse()">
+            {{ course.version() === null ? 'Добавить курс v' : 'Обновить курс до v' }}{{ course.latestVersion }}
+          </button>
         </div>
       }
-    </div>
+    </section>
     @if (importError()) {
       <p class="field__error" role="alert">{{ importError() }}</p>
     }

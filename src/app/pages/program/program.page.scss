@@ -28,6 +28,10 @@
   @apply w-full md:w-64;
 }
 
+.toolbar__origin {
+  @apply w-auto py-1;
+}
+
 .toolbar__actions {
   @apply ml-auto flex gap-1;
 }

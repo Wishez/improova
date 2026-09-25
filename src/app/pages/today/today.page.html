@@ -13,6 +13,17 @@
       <progress tuiProgressBar size="s" class="week__bar" [max]="weekPlan() || 1" [value]="weekFact()"></progress>
     </div>
 
+    @if (course.bannerVisible()) {
+      <div class="side courseBanner" role="status">
+        <span class="side__label">Курс v{{ course.latestVersion }}</span>
+        <p class="side__text">{{ course.releases()[0]?.notes?.[0] ?? 'Доступна новая версия курса.' }}</p>
+        <div class="courseBanner__actions">
+          <a tuiButton size="xs" appearance="secondary" routerLink="/settings">Посмотреть обновление</a>
+          <button tuiButton type="button" size="xs" appearance="flat" (click)="course.dismissBanner()">Скрыть</button>
+        </div>
+      </div>
+    }
+
     <h2 class="card__title today__h">Сегодня</h2>
     @if (!hasProgram()) {
       <app-empty-state

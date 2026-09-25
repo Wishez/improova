@@ -3,6 +3,12 @@ import type { ICollections, IEntity, IImportReport, ISnapshot, TCollection } fro
 
 export type TImportMode = 'replace' | 'merge';
 
+/** Набор записей одной транзакцией: либо все, либо ни одной (НФТ 1.3, FR-46). */
+export interface IWriteBatch {
+  readonly puts: readonly { readonly collection: TCollection; readonly entity: IEntity }[];
+  readonly removes: readonly { readonly collection: TCollection; readonly id: string }[];
+}
+
 /** Контракт хранилища (ТЗ 8.1). Доменные сервисы не знают конкретной реализации. */
 export interface IStorageAdapter {
   readonly kind: string;
@@ -11,6 +17,7 @@ export interface IStorageAdapter {
   put(collection: TCollection, entity: IEntity): Promise<void>;
   putMany(collection: TCollection, entities: readonly IEntity[]): Promise<void>;
   remove(collection: TCollection, id: string): Promise<void>;
+  writeBatch(batch: IWriteBatch): Promise<void>;
   exportAll(): Promise<ISnapshot>;
   importAll(snapshot: ISnapshot, mode: TImportMode): Promise<IImportReport>;
   estimateUsage(): Promise<{ readonly usedBytes: number; readonly quotaBytes: number } | null>;
@@ -33,8 +40,8 @@ export const COLLECTIONS: readonly TCollection[] = [
   'routeBlocks',
 ];
 
-/** 2 — ориентиры, маршрут мастеров и квартальные веса (релиз 1.2). */
-export const SCHEMA_VERSION = 2;
+/** 2 — ориентиры, маршрут мастеров и квартальные веса (релиз 1.2); 3 — версии курса, контрольные, доступ ресурсов (1.3). */
+export const SCHEMA_VERSION = 3;
 
 export function emptyCollections(): ICollections {
   return {

@@ -74,6 +74,9 @@
           <span>Слабое место</span>
         </label>
       </section>
+      @if (current.courseKey !== null && spent() === 0 && !current.doneAt) {
+        <p class="field__hint">Топик из курса: при обновлении курса правки заменятся, пока топик не начат.</p>
+      }
 
       @if (topic(); as currentTopic) {
         <section class="drawer__block">

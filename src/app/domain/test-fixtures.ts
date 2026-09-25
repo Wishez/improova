@@ -21,11 +21,11 @@ export function budgetFixture(patch: Partial<IBudget> = {}): IBudget {
 }
 
 export function sectionFixture(id: string, order: number, weight: 1 | 2 | 3 = 2): ISection {
-  return { id, createdAt: NOW, updatedAt: NOW, title: `Раздел ${id}`, colorToken: 1, order, weight, archived: false, quarterWeights: null };
+  return { id, createdAt: NOW, updatedAt: NOW, title: `Раздел ${id}`, colorToken: 1, order, weight, archived: false, quarterWeights: null, courseKey: null };
 }
 
 export function topicFixture(id: string, sectionId: string, order = 0): ITopic {
-  return { id, createdAt: NOW, updatedAt: NOW, sectionId, title: `Тема ${id}`, description: '', order, archived: false };
+  return { id, createdAt: NOW, updatedAt: NOW, sectionId, title: `Тема ${id}`, description: '', order, archived: false, courseKey: null };
 }
 
 export function itemFixture(params: {
@@ -37,6 +37,7 @@ export function itemFixture(params: {
   readonly doneAt?: string | null;
   readonly recurrenceWeeks?: number | null;
   readonly weakSpot?: boolean;
+  readonly checkpointDay?: number | null;
 }): IItem {
   return {
     id: params.id,
@@ -55,6 +56,9 @@ export function itemFixture(params: {
     archived: false,
     guide: null,
     routeRole: null,
+    courseKey: null,
+    courseHash: null,
+    checkpointDay: params.checkpointDay ?? null,
   };
 }
 

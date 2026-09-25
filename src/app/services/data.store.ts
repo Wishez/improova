@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { buildProgramTree, spentByItem } from '../domain';
-import { SCHEMA_VERSION, STORAGE_ADAPTER, emptyCollections, normalizeCollections } from '../storage';
+import { SCHEMA_VERSION, STORAGE_ADAPTER, emptyCollections, normalizeCollections, type IWriteBatch } from '../storage';
 import type { IBudget, IChallenge, ICollections, IEntity, IMeta, ISettings, ISnapshot, TCollection } from '../types';
 import { addDays, configureTimeZone, downloadText, toDayKey } from '../utils';
 import { ClockService } from './clock.service';
@@ -69,7 +69,16 @@ export class DataStore {
     try {
       await this.adapter.init();
       const data = await this.adapter.loadAll();
-      this.data.set(normalizeCollections(data));
+      const normalized = normalizeCollections(data);
+      this.data.set(normalized);
+      if (data.meta.some((meta) => !('courseVersion' in meta))) {
+        // Миграция 2 → 3 (FR-44): ключи курса сохраняются сразу, чтобы не сопоставлять их при каждом запуске
+        const programs = ['sections', 'topics', 'items', 'resources', 'routeBlocks', 'meta'] as const;
+        await this.adapter.writeBatch({
+          puts: programs.flatMap((collection) => normalized[collection].map((entity: IEntity) => ({ collection, entity }))),
+          removes: [],
+        });
+      }
       await this.ensureDefaults();
       this.status.set('ready');
     } catch {
@@ -119,6 +128,30 @@ export class DataStore {
     void this.flush();
   }
 
+  /**
+   * Атомарная запись набора изменений (FR-46): сначала хранилище одной транзакцией, затем память.
+   * При отказе хранилища данные в памяти не меняются, ошибка уходит вызывающему.
+   */
+  async commit(batch: IWriteBatch): Promise<void> {
+    await this.flush();
+    await this.adapter.writeBatch(batch);
+    this.data.update((data) => {
+      const next: ICollections = { ...data };
+      const touched = new Set([...batch.puts.map((entry) => entry.collection), ...batch.removes.map((entry) => entry.collection)]);
+      for (const collection of touched) {
+        const removed = new Set(batch.removes.filter((entry) => entry.collection === collection).map((entry) => entry.id));
+        const puts = new Map(batch.puts.filter((entry) => entry.collection === collection).map((entry) => [entry.entity.id, entry.entity]));
+        const list: IEntity[] = data[collection].filter((entity: IEntity) => !removed.has(entity.id)).map((entity: IEntity) => {
+          const replacement = puts.get(entity.id);
+          puts.delete(entity.id);
+          return replacement ?? entity;
+        });
+        Object.assign(next, { [collection]: [...list, ...puts.values()] });
+      }
+      return next;
+    });
+  }
+
   updateMeta(patch: Partial<Omit<IMeta, keyof IEntity>>): void {
     const meta = this.meta();
     this.upsert('meta', { ...meta, ...patch, updatedAt: new Date().toISOString() });
@@ -130,7 +163,7 @@ export class DataStore {
 
   async reload(): Promise<void> {
     const data = await this.adapter.loadAll();
-    this.data.set(data);
+    this.data.set(normalizeCollections(data));
     await this.ensureDefaults();
   }
 
@@ -264,6 +297,9 @@ export function defaultMeta(): IMeta {
     lastExportAt: null,
     expanded: [],
     dayPlans: {},
+    courseVersion: null,
+    dismissedCourseKeys: [],
+    courseBannerDismissed: null,
   };
 }
 

@@ -1,32 +1,12 @@
 import { Injectable, computed, inject } from '@angular/core';
-import { challengeWeek, quarterOfWeek, routeFocus, routeTitle, sectionWeightsFor, type IRouteFocus } from '../domain';
-import type { IGuide, IItem, IRouteBlock, ISection } from '../types';
-import { buildSeed } from '../seed';
+import { challengeWeek, planCourseUpdate, quarterOfWeek, routeFocus, routeTitle, sectionWeightsFor, type ICourseSyncPlan, type IRouteFocus } from '../domain';
+import { COURSE } from '../seed';
+import type { ICollections, ICourseRelease, IEntity, IItem, IMeta, IRouteBlock, TCollection } from '../types';
 import { createId } from '../utils';
 import { DataStore } from './data.store';
 import { ToastService } from './toast.service';
 
-export interface ICoursePreview {
-  /** Топики, которым будет добавлен ориентир. */
-  readonly matched: number;
-  /** Топики с собственным ориентиром — не меняются. */
-  readonly kept: number;
-  /** Топики курса без пары в программе: «Раздел / Тема / Топик». */
-  readonly notFound: readonly string[];
-  readonly routeBlocks: number;
-  readonly sectionWeights: number;
-}
-
-interface ICourseChanges {
-  readonly preview: ICoursePreview;
-  readonly items: IItem[];
-  readonly sections: ISection[];
-  readonly routeBlocks: IRouteBlock[];
-}
-
-const pathKey = (...parts: readonly string[]): string => parts.map((part) => part.trim().toLowerCase()).join(' / ');
-
-/** Курс: квартальные веса, маршрут по мастерам и ориентиры стартовой программы (FR-39, FR-40, FR-42). */
+/** Курс: квартальные веса, маршрут по мастерам, версии курса и обновление (FR-39, FR-40, FR-44…FR-46). */
 @Injectable({ providedIn: 'root' })
 export class CourseService {
   private readonly store = inject(DataStore);
@@ -102,6 +82,7 @@ export class CourseService {
       copyTask: '',
       copyTechnique: '',
       links: [],
+      courseKey: null,
     });
   }
 
@@ -111,86 +92,110 @@ export class CourseService {
       return;
     }
     this.store.remove('routeBlocks', [id]);
-    this.toasts.undo({ text: 'Блок маршрута удалён', onUndo: () => this.store.upsert('routeBlocks', block) });
-  }
-
-  // ——— Ориентиры курса для начатых челленджей (FR-42) ———
-
-  preview(): ICoursePreview {
-    return this.changes(new Date().toISOString()).preview;
-  }
-
-  /** Заполняет только пустые ориентиры; прогресс, логи, заметки и оценки не меняются. Повторный запуск безопасен. */
-  apply(): ICoursePreview {
-    const changes = this.changes(new Date().toISOString());
-    this.store.upsertMany('items', changes.items);
-    this.store.upsertMany('sections', changes.sections);
-    this.store.upsertMany('routeBlocks', changes.routeBlocks);
-    return changes.preview;
-  }
-
-  private changes(now: string): ICourseChanges {
-    const seed = buildSeed(now);
-    const data = this.store.data();
-    const seedSection = new Map(seed.sections.map((section) => [section.id, section]));
-    const seedTopic = new Map(seed.topics.map((topic) => [topic.id, topic]));
-    const sectionById = new Map(data.sections.map((section) => [section.id, section]));
-    const topicById = new Map(data.topics.map((topic) => [topic.id, topic]));
-
-    const existing = new Map<string, IItem>();
-    for (const item of data.items) {
-      const topic = topicById.get(item.topicId);
-      const section = topic ? sectionById.get(topic.sectionId) : undefined;
-      if (topic && section && !item.deletedAt) {
-        existing.set(pathKey(section.title, topic.title, item.title), item);
-      }
+    const dismissedBefore = this.store.meta().dismissedCourseKeys;
+    if (block.courseKey) {
+      this.store.updateMeta({ dismissedCourseKeys: [...new Set([...dismissedBefore, block.courseKey])] });
     }
-
-    const items: IItem[] = [];
-    const notFound: string[] = [];
-    let kept = 0;
-    let matched = 0;
-    for (const seedItem of seed.items) {
-      const topic = seedTopic.get(seedItem.topicId);
-      const section = topic ? seedSection.get(topic.sectionId) : undefined;
-      if (!topic || !section) {
-        continue;
-      }
-      const target = existing.get(pathKey(section.title, topic.title, seedItem.title));
-      if (!target) {
-        notFound.push(`${section.title} / ${topic.title} / ${seedItem.title}`);
-        continue;
-      }
-      if (target.guide) {
-        kept += 1;
-        if (target.routeRole === null && seedItem.routeRole !== null) {
-          items.push({ ...target, routeRole: seedItem.routeRole, updatedAt: now });
-        }
-        continue;
-      }
-      const guide: IGuide | null = seedItem.guide;
-      matched += 1;
-      items.push({ ...target, guide, routeRole: target.routeRole ?? seedItem.routeRole, updatedAt: now });
-    }
-
-    const seedWeights = new Map(seed.sections.map((section) => [section.title.trim().toLowerCase(), section.quarterWeights]));
-    const sections = data.sections
-      .filter((section) => section.quarterWeights === null && seedWeights.has(section.title.trim().toLowerCase()))
-      .map((section) => ({ ...section, quarterWeights: seedWeights.get(section.title.trim().toLowerCase()) ?? null, updatedAt: now }));
-
-    const routeBlocks = data.routeBlocks.some((block) => !block.deletedAt) ? [] : seed.routeBlocks;
-
-    return {
-      preview: {
-        matched,
-        kept,
-        notFound,
-        routeBlocks: routeBlocks.length,
-        sectionWeights: sections.length,
+    this.toasts.undo({
+      text: 'Блок маршрута удалён',
+      onUndo: () => {
+        this.store.upsert('routeBlocks', block);
+        this.store.updateMeta({ dismissedCourseKeys: dismissedBefore });
       },
-      items,
-      sections,
-      routeBlocks,
-    };
+    });
+  }
+
+  // ——— Версии курса и обновление (FR-45, FR-46) ———
+
+  /** Версия курса в этом релизе. */
+  readonly latestVersion = COURSE.version;
+  /** Версия курса в данных; null — челлендж без курса. */
+  readonly version = computed(() => this.store.meta().courseVersion);
+  readonly hasUpdate = computed(() => (this.version() ?? 0) < this.latestVersion);
+  /** «Что нового» по всем версиям новее той, что в данных. */
+  readonly releases = computed<readonly ICourseRelease[]>(() =>
+    COURSE.releases.filter((release) => release.version > (this.version() ?? 0)).sort((a, b) => b.version - a.version),
+  );
+  /** Баннер на «Сегодня»: только у челленджа с курсом и пока не закрыт для этой версии. */
+  readonly bannerVisible = computed(
+    () => this.version() !== null && this.hasUpdate() && (this.store.meta().courseBannerDismissed ?? 0) < this.latestVersion,
+  );
+
+  dismissBanner(): void {
+    this.store.updateMeta({ courseBannerDismissed: this.latestVersion });
+  }
+
+  /** План обновления без записи: для предпросмотра. */
+  plan(): ICourseSyncPlan {
+    const data = this.store.data();
+    return planCourseUpdate({
+      data,
+      course: COURSE,
+      dismissedKeys: this.store.meta().dismissedCourseKeys,
+      activeItemId: this.store.meta().timer?.itemId ?? null,
+      currentWeek: this.week(),
+      nowIso: new Date().toISOString(),
+      createId: () => createId(),
+    });
+  }
+
+  /**
+   * Применяет курс одной транзакцией (НФТ 1.3). Прогресс, логи, заметки и план не меняются.
+   * Возвращает план; при отказе хранилища данные не меняются и ошибка уходит вызывающему.
+   */
+  async apply(): Promise<ICourseSyncPlan> {
+    const plan = this.plan();
+    const before = this.store.data();
+    const metaBefore = this.store.meta();
+    const metaNext: IMeta = { ...metaBefore, courseVersion: plan.version, updatedAt: new Date().toISOString() };
+    const puts: { collection: TCollection; entity: IEntity }[] = [
+      ...plan.puts.resources.map((entity) => ({ collection: 'resources' as const, entity })),
+      ...plan.puts.sections.map((entity) => ({ collection: 'sections' as const, entity })),
+      ...plan.puts.topics.map((entity) => ({ collection: 'topics' as const, entity })),
+      ...plan.puts.items.map((entity) => ({ collection: 'items' as const, entity })),
+      ...plan.puts.routeBlocks.map((entity) => ({ collection: 'routeBlocks' as const, entity })),
+      { collection: 'meta', entity: metaNext },
+    ];
+    const removes = plan.removes.routeBlocks.map((id) => ({ collection: 'routeBlocks' as const, id }));
+    await this.store.commit({ puts, removes });
+    this.toasts.show({
+      text: `Курс обновлён до v${plan.version}`,
+      kind: 'success',
+      durationMs: 10_000,
+      action: { label: 'Отменить', run: () => void this.revert({ before, puts, removes }) },
+    });
+    return plan;
+  }
+
+  /** Отмена обновления: изменённое возвращается к прежнему виду, добавленное удаляется. */
+  private async revert(params: {
+    readonly before: ICollections;
+    readonly puts: readonly { readonly collection: TCollection; readonly entity: IEntity }[];
+    readonly removes: readonly { readonly collection: TCollection; readonly id: string }[];
+  }): Promise<void> {
+    const previous = (collection: TCollection, id: string): IEntity | undefined =>
+      params.before[collection].find((entity: IEntity) => entity.id === id);
+    const restore: { collection: TCollection; entity: IEntity }[] = [];
+    const drop: { collection: TCollection; id: string }[] = [];
+    for (const { collection, entity } of params.puts) {
+      const old = previous(collection, entity.id);
+      if (old) {
+        restore.push({ collection, entity: old });
+      } else {
+        drop.push({ collection, id: entity.id });
+      }
+    }
+    for (const { collection, id } of params.removes) {
+      const old = previous(collection, id);
+      if (old) {
+        restore.push({ collection, entity: old });
+      }
+    }
+    try {
+      await this.store.commit({ puts: restore, removes: drop });
+      this.toasts.show({ text: 'Обновление курса отменено' });
+    } catch {
+      this.toasts.show({ text: 'Не удалось отменить обновление: хранилище не отвечает.', kind: 'error' });
+    }
   }
 }

@@ -37,6 +37,20 @@
       <input class="input num" type="number" min="0" step="0.5" [value]="draft().minPerUnit" (input)="patch('minPerUnit', $event)" />
       <span class="field__hint">Книга — ~4 мин/стр с конспектом, видео — длительность × 1,5</span>
     </label>
+    <label class="field">
+      <span class="field__label">Доступ</span>
+      <select class="input" (change)="patch('access', $event)">
+        @for (access of accesses; track access) {
+          <option [value]="access" [selected]="draft().access === access">{{ accessLabel[access] }}</option>
+        }
+      </select>
+    </label>
+    @if (draft().access === 'paid') {
+      <label class="field resForm__wide">
+        <span class="field__label">Бесплатная замена</span>
+        <input class="input" type="url" placeholder="https:// — легальная бесплатная альтернатива, необязательно" [value]="draft().freeAlternativeUrl" (input)="patch('freeAlternativeUrl', $event)" />
+      </label>
+    }
     @if (error()) {
       <span class="field__error resForm__wide" role="alert">{{ error() }}</span>
     }
@@ -49,7 +63,19 @@
 
 <div class="resources">
   <div class="resources__bar">
-    <span class="muted">{{ resources().length }} в библиотеке</span>
+    <span class="muted">{{ resources().length }} из {{ library().length }} в библиотеке</span>
+    <div class="resources__filters">
+      <select class="input resources__filter" aria-label="Доступ" (change)="setAccessFilter($event)">
+        <option value="all" [selected]="accessFilter() === 'all'">Любой доступ</option>
+        <option value="free" [selected]="accessFilter() === 'free'">Бесплатно</option>
+        <option value="paid" [selected]="accessFilter() === 'paid'">Платно</option>
+      </select>
+      <select class="input resources__filter" aria-label="Происхождение" (change)="setOriginFilter($event)">
+        <option value="all" [selected]="originFilter() === 'all'">Все</option>
+        <option value="course" [selected]="originFilter() === 'course'">Из курса</option>
+        <option value="custom" [selected]="originFilter() === 'custom'">Свои</option>
+      </select>
+    </div>
     @if (editingId() !== 'new') {
       <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.plus" (click)="startNew()">Добавить ресурс</button>
     }
@@ -57,8 +83,10 @@
   @if (editingId() === 'new') {
     <div class="card"><ng-container [ngTemplateOutlet]="form" /></div>
   }
-  @if (resources().length === 0 && editingId() !== 'new') {
+  @if (library().length === 0 && editingId() !== 'new') {
     <app-empty-state title="Библиотека пуста" body="Добавь книгу, курс или видео — из них можно собрать топики." cta="Добавить ресурс" (action)="startNew()" />
+  } @else if (resources().length === 0 && editingId() !== 'new') {
+    <p class="muted">Под фильтр ничего не подходит.</p>
   }
   <ul class="resList">
     @for (resource of resources(); track resource.id) {
@@ -72,6 +100,15 @@
             } @else {
               <span class="res__title">{{ resource.title }}</span>
             }
+            <span class="res__tags">
+              <span class="tag" [class.tag_pd]="resource.access === 'pd'" [class.tag_paid]="resource.access === 'paid'">{{ accessLabel[resource.access] }}</span>
+              @if (resource.courseKey === null) {
+                <span class="tag">своё</span>
+              }
+              @if (resource.access === 'paid' && resource.freeAlternativeUrl) {
+                <a class="res__alt" [href]="resource.freeAlternativeUrl" target="_blank" rel="noopener noreferrer">Бесплатная замена</a>
+              }
+            </span>
             <span class="res__meta">
               {{ typeLabel[resource.type] }}{{ resource.author ? ' · ' + resource.author : '' }}
               @if (resource.unitCount > 0) {

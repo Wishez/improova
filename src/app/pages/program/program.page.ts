@@ -9,12 +9,15 @@ import { map } from 'rxjs';
 import { EmptyStateComponent } from '../../components';
 import { progressOfItems, sectionItems, type IProgress } from '../../domain';
 import { MarkdownPipe, MinutesPipe } from '../../pipes';
-import { DataStore, ProgramService, UiStateService, parseBulkLines, type TProgramEntity } from '../../services';
+import { CourseService, DataStore, ProgramService, UiStateService, parseBulkLines, type TProgramEntity } from '../../services';
 import type { IItem, ISection, ITopic, TSectionWeight } from '../../types';
 import { ResourcesPanelComponent } from './resources-panel.component';
 import { RoutePanelComponent } from './route-panel.component';
 
 type TFilter = 'all' | 'inProgress' | 'todo' | 'done' | 'weak';
+
+/** Происхождение (FR-44): из курса или своё. */
+type TOrigin = 'all' | 'course' | 'custom';
 
 interface ITopicView {
   readonly topic: ITopic;
@@ -62,12 +65,16 @@ export class ProgramPage {
   private readonly store = inject(DataStore);
   private readonly program = inject(ProgramService);
   protected readonly ui = inject(UiStateService);
+  /** «своё» показывается только у челленджа с курсом: без курса своё — всё. */
+  private readonly course = inject(CourseService);
+  protected readonly withCourse = computed(() => this.course.version() !== null);
   private readonly focusSection = toSignal(inject(ActivatedRoute).queryParamMap.pipe(map((params) => params.get('section'))));
 
   protected readonly filters = FILTERS;
   protected readonly tab = signal<'program' | 'resources' | 'route'>('program');
   protected readonly filter = signal<TFilter>('all');
   protected readonly query = signal('');
+  protected readonly origin = signal<TOrigin>('all');
   protected readonly editing = signal<{ readonly kind: TProgramEntity; readonly id: string } | null>(null);
   protected readonly addingTopicFor = signal<string | null>(null);
   protected readonly addingItemsFor = signal<string | null>(null);
@@ -84,7 +91,11 @@ export class ProgramPage {
     const spent = this.store.spent();
     const needle = this.query().trim().toLowerCase();
     const filter = this.filter();
+    const origin = this.origin();
     const matchesItem = (item: IItem): boolean => {
+      if (origin !== 'all' && (origin === 'course') !== (item.courseKey !== null)) {
+        return false;
+      }
       const byFilter =
         filter === 'all' ||
         (filter === 'done' && item.doneAt !== null) ||
@@ -93,13 +104,13 @@ export class ProgramPage {
         (filter === 'inProgress' && item.doneAt === null && (spent.get(item.id) ?? 0) > 0);
       return byFilter && (needle === '' || item.title.toLowerCase().includes(needle));
     };
-    const narrowed = filter !== 'all' || needle !== '';
+    const narrowed = filter !== 'all' || needle !== '' || origin !== 'all';
     return tree.sections
       .map((section) => {
         const topics = (tree.topicsBySection.get(section.id) ?? [])
           .map((topic) => {
             const all = tree.itemsByTopic.get(topic.id) ?? [];
-            const topicMatches = needle !== '' && topic.title.toLowerCase().includes(needle) && filter === 'all';
+            const topicMatches = needle !== '' && topic.title.toLowerCase().includes(needle) && filter === 'all' && origin === 'all';
             return { topic, items: topicMatches ? all : all.filter(matchesItem), progress: progressOfItems(all, spent) };
           })
           .filter((entry) => !narrowed || entry.items.length > 0);
@@ -108,7 +119,7 @@ export class ProgramPage {
       .filter((entry) => !narrowed || entry.topics.length > 0 || entry.section.title.toLowerCase().includes(needle));
   });
   protected readonly isEmpty = computed(() => this.store.tree().sections.length === 0);
-  protected readonly narrowed = computed(() => this.filter() !== 'all' || this.query().trim() !== '');
+  protected readonly narrowed = computed(() => this.filter() !== 'all' || this.query().trim() !== '' || this.origin() !== 'all');
   protected readonly allTopicIds = computed(() => this.view().flatMap((section) => section.topics.map((entry) => `topic-${entry.topic.id}`)));
 
   constructor() {
@@ -144,6 +155,11 @@ export class ProgramPage {
 
   protected setFilter(index: number): void {
     this.filter.set(FILTERS[index]?.id ?? 'all');
+  }
+
+  protected setOrigin(event: Event): void {
+    const value = this.text(event);
+    this.origin.set(value === 'course' || value === 'custom' ? value : 'all');
   }
 
   protected text(event: Event): string {

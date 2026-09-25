@@ -3,8 +3,9 @@ import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@a
 import { TuiButton, TuiDialog } from '@taiga-ui/core';
 import { TuiSwitch } from '@taiga-ui/kit';
 import type { TTipId } from '../../domain';
-import { MinutesPipe } from '../../pipes';
-import { BackupService, CourseService, DataStore, ToastService, type ICoursePreview, type TImportCheck } from '../../services';
+import { DayShortPipe, MinutesPipe } from '../../pipes';
+import type { ICourseSyncPlan } from '../../domain';
+import { BackupService, CourseService, DataStore, type TImportCheck } from '../../services';
 import type { IBudget, ISection, ISnapshot, TSectionWeight } from '../../types';
 import { addDays, deviceTimeZone, diffDays, isValidDayKey, isValidTimeZone, weekdayShort } from '../../utils';
 
@@ -20,7 +21,7 @@ const TIP_TOGGLES: readonly { readonly id: TTipId; readonly label: string }[] = 
 /** Настройки: бюджет, дни, челлендж, звук, подсказки, данные (FR-32, FR-33). */
 @Component({
   selector: 'app-settings-page',
-  imports: [FormsModule, TuiButton, TuiSwitch, TuiDialog, MinutesPipe],
+  imports: [FormsModule, TuiButton, TuiSwitch, TuiDialog, MinutesPipe, DayShortPipe],
   templateUrl: './settings.page.html',
   styleUrl: './settings.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,14 +30,15 @@ export class SettingsPage {
   protected readonly store = inject(DataStore);
   protected readonly backup = inject(BackupService);
   protected readonly course = inject(CourseService);
-  private readonly toasts = inject(ToastService);
   protected readonly sections = computed(() =>
     this.store
       .data()
       .sections.filter((section) => !section.archived)
       .sort((a, b) => a.order - b.order),
   );
-  protected readonly coursePreview = signal<ICoursePreview | null>(null);
+  protected readonly coursePlan = signal<ICourseSyncPlan | null>(null);
+  protected readonly courseApplying = signal(false);
+  protected readonly courseError = signal('');
 
   protected readonly budget = this.store.budget;
   protected readonly settings = this.store.settings;
@@ -233,12 +235,21 @@ export class SettingsPage {
   }
 
   protected previewCourse(): void {
-    this.coursePreview.set(this.course.preview());
+    this.courseError.set('');
+    this.coursePlan.set(this.course.plan());
   }
 
-  protected applyCourse(): void {
-    const result = this.course.apply();
-    this.coursePreview.set(null);
-    this.toasts.show({ text: `Ориентиры добавлены в ${result.matched} топиков`, kind: 'success' });
+  /** Обновление курса (FR-46): при отказе хранилища данные не меняются, можно повторить. */
+  protected async applyCourse(): Promise<void> {
+    this.courseApplying.set(true);
+    this.courseError.set('');
+    try {
+      await this.course.apply();
+      this.coursePlan.set(null);
+    } catch {
+      this.courseError.set('Не удалось сохранить обновление: хранилище не отвечает. Данные не изменились — попробуй ещё раз.');
+    } finally {
+      this.courseApplying.set(false);
+    }
   }
 }

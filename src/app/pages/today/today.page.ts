@@ -27,7 +27,7 @@ export class TodayPage {
   protected readonly insights = inject(InsightsService);
   protected readonly backup = inject(BackupService);
   private readonly program = inject(ProgramService);
-  private readonly course = inject(CourseService);
+  protected readonly course = inject(CourseService);
   protected readonly router = inject(Router);
 
   protected readonly typeLabel = SESSION_TYPE_LABEL;

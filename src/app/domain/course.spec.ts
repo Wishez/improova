@@ -90,7 +90,7 @@ describe('стартовая программа v2 заполнена корре
   const seed = buildSeed('2026-01-05T00:00:00.000Z');
 
   it('у каждого топика есть корректный ориентир с целью, заданием, шагами и стоп-критерием', () => {
-    expect(seed.items.length).toBe(74);
+    expect(seed.items.length).toBe(79);
     for (const item of seed.items) {
       const guide = item.guide;
       expect(guide, item.title).not.toBeNull();

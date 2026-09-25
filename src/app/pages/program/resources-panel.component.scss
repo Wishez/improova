@@ -5,7 +5,15 @@
 }
 
 .resources__bar {
-  @apply flex items-center justify-between;
+  @apply flex flex-wrap items-center justify-between gap-2;
+}
+
+.resources__filters {
+  @apply flex flex-wrap gap-2;
+}
+
+.resources__filter {
+  @apply w-auto py-1;
 }
 
 .resList {
@@ -22,6 +30,14 @@
 
 .res__title {
   @apply truncate text-body font-semibold text-text-1 no-underline hover:text-accent;
+}
+
+.res__tags {
+  @apply flex flex-wrap items-center gap-1.5;
+}
+
+.res__alt {
+  @apply text-meta text-text-2 underline;
 }
 
 .res__meta {

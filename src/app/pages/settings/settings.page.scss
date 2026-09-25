@@ -109,10 +109,34 @@
   @apply flex flex-col gap-2 rounded-control bg-surface-2 p-3;
 }
 
-.coursePanel__missing {
+.coursePanel__details {
   @apply text-meta text-text-2;
 
   summary {
     @apply cursor-pointer;
   }
+}
+
+.coursePanel__release {
+  @apply m-0 mt-2 text-meta text-text-1;
+}
+
+.coursePanel__list {
+  @apply m-0 mt-1 flex flex-col gap-1 pl-5 text-meta text-text-2;
+}
+
+.coursePlan {
+  @apply flex flex-col gap-2 border-t border-border pt-2;
+}
+
+.coursePlan__groups {
+  @apply m-0 flex list-none flex-col gap-2 p-0 text-body text-text-1;
+
+  summary {
+    @apply cursor-pointer;
+  }
+}
+
+.coursePlan__warn {
+  @apply m-0 text-meta text-warning;
 }

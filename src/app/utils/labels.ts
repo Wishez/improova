@@ -1,4 +1,7 @@
-import type { TResourceType, TResourceUnit, TSessionType } from '../types';
+import type { TLinkAccess, TResourceType, TResourceUnit, TSessionType } from '../types';
+
+/** Доступ к источнику (FR-43). */
+export const ACCESS_LABEL: Readonly<Record<TLinkAccess, string>> = { pd: 'общественное достояние', free: 'бесплатно', paid: 'платно' };
 
 export const SESSION_TYPE_LABEL: Readonly<Record<TSessionType, string>> = {
   study: 'Учёба',

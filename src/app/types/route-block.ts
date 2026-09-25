@@ -21,4 +21,6 @@ export interface IRouteBlock extends IEntity {
   readonly copyTask: string;
   readonly copyTechnique: string;
   readonly links: readonly IGuideLink[];
+  /** Ключ курса (FR-44): стабильный идентификатор стартовой сущности; null — своя. */
+  readonly courseKey: string | null;
 }

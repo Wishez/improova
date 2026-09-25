@@ -13,6 +13,19 @@ body {
   @apply outline-2 outline-offset-2 outline-accent;
 }
 
+/* Метка: «своё», доступ ресурса (FR-43, FR-44) */
+.tag {
+  @apply inline-flex items-center whitespace-nowrap rounded-control bg-surface-2 px-1.5 py-0.5 text-micro text-text-3;
+}
+
+.tag_pd {
+  @apply text-success;
+}
+
+.tag_paid {
+  @apply text-warning;
+}
+
 .visuallyHidden {
   @apply sr-only;
 }
@@ -167,4 +180,17 @@ tui-hint[tuiAppearance] {
   --tui-background-accent-1: var(--color-surface-3);
   --tui-text-primary-on-accent-1: var(--color-text-1);
   @apply border border-border-control text-meta;
+}
+
+/* Появление уведомлений; при prefers-reduced-motion анимация отключена глобально */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }

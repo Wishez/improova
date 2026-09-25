@@ -41,4 +41,10 @@ export interface IMeta extends IEntity {
   /** План дня в минутах, зафиксированный в сам день: календарь не пересчитывает прошлое (FR-36). */
   readonly dayPlans: Readonly<Record<string, number>>;
   readonly expanded: readonly string[];
+  /** Версия курса в данных (FR-45); null — челлендж без курса. */
+  readonly courseVersion: number | null;
+  /** Ключи стартовых сущностей, удалённых пользователем: обновление курса их не возвращает. */
+  readonly dismissedCourseKeys: readonly string[];
+  /** Версия курса, баннер которой закрыт на «Сегодня». */
+  readonly courseBannerDismissed: number | null;
 }

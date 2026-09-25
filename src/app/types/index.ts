@@ -1,6 +1,7 @@
 export * from './asset';
 export * from './budget';
 export * from './challenge';
+export * from './course';
 export * from './entity';
 export * from './guide';
 export * from './item';
