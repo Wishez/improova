@@ -122,6 +122,21 @@ const WEEKDAYS_SHORT = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
 const WEEKDAYS_ACC = ['понедельник', 'вторник', 'среду', 'четверг', 'пятницу', 'субботу', 'воскресенье'];
 const MONTHS_GEN = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
 
+const MONTHS_NOM = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const MONTHS_GEN_FULL = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+
+/** «Октябрь 2026» по ключу месяца YYYY-MM. */
+export function formatMonth(monthKey: string): string {
+  const [year, month] = monthKey.split('-').map(Number);
+  return `${MONTHS_NOM[(month ?? 1) - 1] ?? ''} ${year ?? ''}`;
+}
+
+/** «26 октября» — для подписей дней в календаре. */
+export function formatDayLong(key: string): string {
+  const date = fromDayKey(key);
+  return `${date.getDate()} ${MONTHS_GEN_FULL[date.getMonth()] ?? ''}`;
+}
+
 export function weekdayShort(index: number): string {
   return WEEKDAYS_SHORT[index] ?? '';
 }

@@ -3,10 +3,19 @@
     <h1 class="pageTitle">План</h1>
     <p class="head__sub muted num">Бюджет {{ wanted() | minutes }} в неделю · свободно {{ planner.plan().capacityPerWeek | minutes }}</p>
   </div>
-  <button tuiButton type="button" size="s" appearance="flat" iconStart="@tui.settings" (click)="router.navigateByUrl('/settings')">Бюджет и дни</button>
+  <div class="head__actions">
+    <tui-segmented size="s" [activeItemIndex]="viewIndex()" (activeItemIndexChange)="setView($event)">
+      @for (entry of views; track entry.id) {
+        <button type="button">{{ entry.label }}</button>
+      }
+    </tui-segmented>
+    <button tuiButton type="button" size="s" appearance="flat" iconStart="@tui.settings" (click)="router.navigateByUrl('/settings')">Бюджет и дни</button>
+  </div>
 </header>
 
-@if (noBudget()) {
+@if (view() !== 'week' && !noBudget() && !noDays()) {
+  <app-calendar [view]="view() === 'year' ? 'year' : 'month'" (viewChange)="view.set($event)" />
+} @else if (noBudget()) {
   <app-empty-state title="Сколько времени в неделю?" body="Укажи минуты на ресурсы и на практику — план на неделю построится автоматически." cta="Задать бюджет" (action)="router.navigateByUrl('/settings')" />
 } @else if (noDays()) {
   <app-empty-state title="Нет дней для занятий" body="Во всех днях недели 0 минут. Отметь хотя бы один день для занятий." cta="Выбрать дни" (action)="router.navigateByUrl('/settings')" />

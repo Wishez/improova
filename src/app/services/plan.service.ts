@@ -1,7 +1,8 @@
-import { Injectable, computed, inject } from '@angular/core';
-import { planWeek, type IPlannedBlock } from '../domain';
+import { Injectable, computed, effect, inject, untracked } from '@angular/core';
+import { buildCalendar, dayOf, sectionIdOfItem, sectionWeightsFor, planWeek, type IPlannedBlock } from '../domain';
 import type { IPlanBlock } from '../types';
 import { addDays, createId } from '../utils';
+import { CourseService } from './course.service';
 import { DataStore } from './data.store';
 import { ToastService } from './toast.service';
 
@@ -12,6 +13,7 @@ export const HORIZON_DAYS = 7;
 export class PlanService {
   private readonly store = inject(DataStore);
   private readonly toasts = inject(ToastService);
+  private readonly course = inject(CourseService);
 
   readonly plan = computed(() =>
     planWeek({
@@ -23,10 +25,62 @@ export class PlanService {
       logs: this.store.logs(),
       blocks: this.store.data().planBlocks,
       boundaryHour: this.store.settings().dayBoundaryHour,
+      sectionWeights: this.course.sectionWeights(),
     }),
   );
 
+  /** Календарь всего челленджа (FR-36): считается только когда открыт. */
+  readonly calendar = computed(() => {
+    const plan = this.plan();
+    const tree = this.store.tree();
+    const boundary = this.store.settings().dayBoundaryHour;
+    const factByDay = new Map<string, number>();
+    for (const log of this.store.logs()) {
+      const day = dayOf(log, boundary);
+      factByDay.set(day, (factByDay.get(day) ?? 0) + log.durationMin);
+    }
+    const remainingBySection = new Map<string, number>();
+    for (const [itemId, minutes] of plan.remainingByItem) {
+      const item = tree.itemById.get(itemId);
+      const sectionId = sectionIdOfItem(tree, itemId);
+      if (sectionId && item && item.recurrenceWeeks === null) {
+        remainingBySection.set(sectionId, (remainingBySection.get(sectionId) ?? 0) + minutes);
+      }
+    }
+    const sections = this.store.data().sections.filter((section) => !section.archived);
+    const seasonal = this.store.budget().seasonalWeights;
+    return buildCalendar({
+      challenge: this.store.challenge(),
+      budget: this.store.budget(),
+      today: this.store.today(),
+      scale: plan.scale,
+      factByDay,
+      dayPlans: this.store.meta().dayPlans,
+      planDays: plan.days,
+      sections,
+      remainingBySection,
+      weightsForQuarter: (quarter) => sectionWeightsFor({ sections, quarter, seasonal }),
+      routeBlocks: this.course.routeBlocks(),
+    });
+  });
+
   readonly today = computed(() => this.plan().days[0] ?? null);
+
+  constructor() {
+    // План дня фиксируется при первом расчёте в этот день: прошлое в календаре не меняется от новых настроек
+    effect(() => {
+      const day = this.today();
+      if (!day || this.store.status() !== 'ready' || !this.store.meta().onboarded) {
+        return;
+      }
+      untracked(() => {
+        const dayPlans = this.store.meta().dayPlans;
+        if (dayPlans[day.date] === undefined) {
+          this.store.updateMeta({ dayPlans: { ...dayPlans, [day.date]: day.planned + day.logged } });
+        }
+      });
+    });
+  }
 
   skip(block: IPlannedBlock): void {
     const created = this.persist({ ...block, pinned: false, status: 'skipped' });

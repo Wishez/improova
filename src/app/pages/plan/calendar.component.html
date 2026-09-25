@@ -1,0 +1,171 @@
+<p class="calSummary muted num">
+  День {{ summary().index }} из {{ summary().total }} · выполнено {{ summary().done }} из {{ summary().passed }} прошедших учебных дней
+</p>
+
+<ul class="legend" aria-label="Обозначения">
+  @for (state of legendStates; track state) {
+    <li class="legend__item"><span class="calDot" [attr.data-state]="state"></span>{{ stateLabel[state] }}</li>
+  }
+</ul>
+
+@if (view() === 'month') {
+  @if (month(); as current) {
+    <div class="calMonth">
+      <div class="calMonth__nav">
+        <button tuiIconButton type="button" size="s" appearance="flat" iconStart="@tui.chevron-left" class="calMonth__prev" [disabled]="monthIndex() === 0" (click)="shiftMonth(-1)">Предыдущий месяц</button>
+        <h2 class="calMonth__title">{{ title(current.key) }}</h2>
+        <button tuiIconButton type="button" size="s" appearance="flat" iconStart="@tui.chevron-right" class="calMonth__next" [disabled]="monthIndex() === months().length - 1" (click)="shiftMonth(1)">Следующий месяц</button>
+        <button tuiButton type="button" size="xs" appearance="flat" class="calMonth__today" (click)="goToday()">Сегодня</button>
+      </div>
+      <div #grid class="calGrid" role="grid" [attr.aria-label]="title(current.key)" (keydown)="onKey($event)">
+        <div class="calGrid__row" role="row">
+          @for (name of weekdays; track name) {
+            <span class="calGrid__weekday" role="columnheader">{{ name }}</span>
+          }
+        </div>
+        <div class="calGrid__days">
+          @for (pad of pads(current.lead); track $index) {
+            <span class="calCell calCell_empty" aria-hidden="true"></span>
+          }
+          @for (cell of current.cells; track cell.date) {
+            @if (cell.day; as day) {
+              <button
+                type="button"
+                role="gridcell"
+                class="calCell"
+                [attr.data-state]="day.state"
+                [class.calCell_selected]="day.date === selected()"
+                [attr.aria-selected]="day.date === selected()"
+                [attr.aria-label]="label(day)"
+                [attr.tabindex]="day.date === selected() ? 0 : -1"
+                (click)="select(day.date)"
+              >
+                <span class="calCell__num num">{{ dayNumber(day.date) }}</span>
+                @if (day.planMin > 0 || day.factMin > 0) {
+                  <span class="calCell__min num">
+                    @if (day.state === 'planned' || day.state === 'projected') {
+                      {{ day.planMin | minutes }}
+                    } @else {
+                      {{ day.factMin | minutes }}
+                    }
+                  </span>
+                }
+                @if (day.markers.length > 0) {
+                  <span class="calCell__markers">
+                    @for (marker of day.markers; track marker.label) {
+                      <span class="calMarker" [attr.data-kind]="marker.kind"></span>
+                    }
+                  </span>
+                }
+              </button>
+            } @else {
+              <span class="calCell calCell_outside" aria-hidden="true"><span class="calCell__num num">{{ dayNumber(cell.date) }}</span></span>
+            }
+          }
+        </div>
+      </div>
+    </div>
+  }
+
+  @if (selectedDay(); as day) {
+    <section class="dayPanel card" aria-live="polite">
+      <div class="dayPanel__head">
+        <h3 class="dayPanel__title">{{ dayTitle(day.date) }}</h3>
+        <span class="dayPanel__state"><span class="calDot" [attr.data-state]="day.state"></span>{{ stateLabel[day.state] }}</span>
+      </div>
+      @for (marker of day.markers; track marker.label) {
+        <p class="dayPanel__marker"><span class="calMarker" [attr.data-kind]="marker.kind"></span>{{ marker.label }}</p>
+      }
+      @switch (day.state) {
+        @case ('projected') {
+          <p class="muted dayPanel__p">Прогноз: топики назначатся за 7 дней. Минуты по разделам — с учётом весов квартала.</p>
+          <ul class="dayPanel__list">
+            @for (entry of daySections(); track entry.key) {
+              <li class="dayPanel__row">
+                <span><span class="sectionDot" [class]="'sectionDot ' + entry.color"></span> {{ entry.title }}</span>
+                <span class="num">{{ entry.minutes | minutes }}</span>
+              </li>
+            }
+          </ul>
+        }
+        @case ('planned') {
+          <ul class="dayPanel__list">
+            @for (block of dayBlocks(); track block.key) {
+              <li class="dayPanel__row">
+                @if (block.itemId; as itemId) {
+                  <button type="button" class="dayPanel__link" (click)="ui.openItem(itemId)">{{ block.title }}</button>
+                } @else {
+                  <span>{{ block.title }}</span>
+                }
+                <span class="num">{{ block.minutes | minutes }}</span>
+              </li>
+            }
+          </ul>
+        }
+        @default {
+          @if (day.planMin > 0) {
+            <p class="dayPanel__p num">Факт {{ day.factMin | minutes }} из {{ day.planMin | minutes }}</p>
+          }
+          @if (day.state === 'today') {
+            <ul class="dayPanel__list">
+              @for (block of dayBlocks(); track block.key) {
+                <li class="dayPanel__row">
+                  @if (block.itemId; as itemId) {
+                    <button type="button" class="dayPanel__link" (click)="ui.openItem(itemId)">{{ block.title }}</button>
+                  } @else {
+                    <span>{{ block.title }}</span>
+                  }
+                  <span class="num">{{ block.minutes | minutes }}</span>
+                </li>
+              }
+            </ul>
+          }
+          @if (dayLogs().length > 0) {
+            <ul class="dayPanel__list">
+              @for (log of dayLogs(); track log.id) {
+                <li class="dayPanel__row">
+                  @if (log.itemId; as itemId) {
+                    <button type="button" class="dayPanel__link" (click)="ui.openItem(itemId)">{{ log.title }}</button>
+                  } @else {
+                    <span>{{ log.title }}</span>
+                  }
+                  <span class="num">{{ log.minutes | minutes }}</span>
+                </li>
+              }
+            </ul>
+          } @else if (day.state !== 'today') {
+            <p class="muted dayPanel__p">{{ day.state === 'off' ? 'Выходной по плану.' : 'Сессий не было.' }}</p>
+          }
+        }
+      }
+    </section>
+  }
+} @else {
+  <div class="calYear">
+    @for (current of months(); track current.key) {
+      <section class="yearMonth" [attr.aria-label]="title(current.key)">
+        <h3 class="yearMonth__title">{{ title(current.key) }}</h3>
+        <div class="yearMonth__grid">
+          @for (pad of pads(current.lead); track $index) {
+            <span class="yearCell yearCell_empty" aria-hidden="true"></span>
+          }
+          @for (cell of current.cells; track cell.date) {
+            @if (cell.day; as day) {
+              <button
+                type="button"
+                class="yearCell"
+                [attr.data-state]="day.state"
+                [class.yearCell_marker]="day.markers.length > 0"
+                [attr.aria-label]="label(day)"
+                [title]="label(day)"
+                (click)="openMonth(day.date)"
+              ></button>
+            } @else {
+              <span class="yearCell yearCell_outside" aria-hidden="true"></span>
+            }
+          }
+        </div>
+      </section>
+    }
+  </div>
+}

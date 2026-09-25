@@ -4,6 +4,10 @@
   @apply flex flex-wrap items-center justify-between gap-4 pt-2 pb-4;
 }
 
+.head__actions {
+  @apply flex flex-wrap items-center gap-2;
+}
+
 .head__sub {
   @apply m-0 mt-1 text-body;
 }

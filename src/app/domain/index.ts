@@ -1,3 +1,5 @@
+export * from './calendar';
+export * from './course';
 export * from './estimate';
 export * from './motivation';
 export * from './planner';

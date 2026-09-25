@@ -1,0 +1,254 @@
+@reference '../../../tailwind.css';
+
+:host {
+  @apply flex flex-col gap-4;
+}
+
+.calSummary {
+  @apply m-0 text-meta;
+}
+
+.legend {
+  @apply m-0 flex list-none flex-wrap gap-x-4 gap-y-2 p-0 text-meta text-text-3;
+}
+
+.legend__item {
+  @apply flex items-center gap-1.5;
+}
+
+/* Состояние дня передаётся формой, а не только цветом: заливка, половина, контур, пунктир */
+.calDot {
+  @apply inline-block h-3 w-3 shrink-0 rounded-xs border border-transparent bg-surface-3;
+}
+
+.calDot[data-state='done'] {
+  @apply bg-accent;
+}
+
+.calDot[data-state='partial'] {
+  @apply border-accent bg-linear-to-t from-accent from-50% to-transparent to-50%;
+}
+
+.calDot[data-state='missed'] {
+  @apply border-danger bg-transparent;
+}
+
+.calDot[data-state='today'] {
+  @apply border-2 border-text-1 bg-transparent;
+}
+
+.calDot[data-state='planned'] {
+  @apply border-text-2 bg-transparent;
+}
+
+.calDot[data-state='projected'] {
+  @apply border-dashed border-text-3 bg-transparent;
+}
+
+.calDot[data-state='off'] {
+  @apply bg-surface-2;
+}
+
+.calMonth {
+  @apply flex flex-col gap-3;
+}
+
+.calMonth__nav {
+  @apply flex items-center gap-2;
+}
+
+.calMonth__title {
+  @apply m-0 min-w-44 text-center text-lead font-semibold text-text-1;
+}
+
+.calMonth__today {
+  @apply ml-auto;
+}
+
+.calGrid {
+  @apply flex flex-col gap-1;
+}
+
+.calGrid__row,
+.calGrid__days {
+  @apply grid grid-cols-7 gap-1;
+}
+
+.calGrid__weekday {
+  @apply text-center text-micro text-text-3 uppercase;
+}
+
+.calCell {
+  @apply relative flex min-h-14 flex-col items-start gap-0.5 rounded-control border border-border bg-surface-1 p-1.5 text-left transition-colors duration-(--duration-fast) md:min-h-20 md:p-2;
+  @apply cursor-pointer hover:border-border-control focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent;
+}
+
+.calCell__num {
+  @apply text-meta font-semibold text-text-1;
+}
+
+.calCell__min {
+  @apply text-micro text-text-2;
+}
+
+.calCell__markers {
+  @apply absolute top-1.5 right-1.5 flex gap-0.5;
+}
+
+.calCell[data-state='done'] {
+  @apply border-accent/50 bg-accent-dim;
+}
+
+.calCell[data-state='partial'] {
+  @apply border-accent/30;
+}
+
+.calCell[data-state='missed'] {
+  @apply border-danger/40;
+}
+
+.calCell[data-state='today'] {
+  @apply border-2 border-text-1;
+}
+
+.calCell[data-state='planned'] {
+  @apply border-text-3;
+}
+
+.calCell[data-state='projected'] {
+  @apply border-dashed bg-transparent;
+}
+
+.calCell[data-state='off'] {
+  @apply border-transparent bg-transparent;
+}
+
+.calCell[data-state='off'] .calCell__num {
+  @apply font-normal text-text-3;
+}
+
+.calCell_selected {
+  @apply ring-2 ring-accent;
+}
+
+.calCell_empty {
+  @apply border-0 bg-transparent;
+}
+
+.calCell_outside {
+  @apply cursor-default border-transparent bg-transparent opacity-30;
+}
+
+.calMarker {
+  @apply inline-block h-1.5 w-1.5 rounded-full bg-text-2;
+}
+
+.calMarker[data-kind='quarter'] {
+  @apply bg-accent;
+}
+
+.calMarker[data-kind='route'] {
+  @apply bg-section-2;
+}
+
+.calMarker[data-kind='milestone'],
+.calMarker[data-kind='end'] {
+  @apply bg-warning;
+}
+
+.calMarker[data-kind='eta'] {
+  @apply bg-success;
+}
+
+.dayPanel {
+  @apply flex flex-col gap-2;
+}
+
+.dayPanel__head {
+  @apply flex items-center justify-between gap-2;
+}
+
+.dayPanel__title {
+  @apply m-0 text-lead font-semibold text-text-1;
+}
+
+.dayPanel__state {
+  @apply flex items-center gap-1.5 text-meta text-text-2;
+}
+
+.dayPanel__marker {
+  @apply m-0 flex items-center gap-2 text-meta text-text-2;
+}
+
+.dayPanel__p {
+  @apply m-0 text-body;
+}
+
+.dayPanel__list {
+  @apply m-0 flex list-none flex-col gap-1 p-0;
+}
+
+.dayPanel__row {
+  @apply flex items-center justify-between gap-3 border-b border-border py-1.5 text-body text-text-1 last:border-b-0;
+}
+
+.dayPanel__link {
+  @apply cursor-pointer border-0 bg-transparent p-0 text-left text-body text-text-1 underline decoration-text-3 underline-offset-2 hover:decoration-accent;
+}
+
+.calYear {
+  @apply grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+}
+
+.yearMonth {
+  @apply flex flex-col gap-2 rounded-card bg-surface-1 p-3;
+}
+
+.yearMonth__title {
+  @apply m-0 text-meta font-semibold text-text-2;
+}
+
+.yearMonth__grid {
+  @apply grid grid-cols-7 gap-1;
+}
+
+.yearCell {
+  @apply aspect-square w-full cursor-pointer rounded-xs border border-transparent bg-surface-3 p-0 focus-visible:outline-2 focus-visible:outline-accent;
+}
+
+.yearCell[data-state='done'] {
+  @apply bg-accent;
+}
+
+.yearCell[data-state='partial'] {
+  @apply border-accent bg-linear-to-t from-accent from-50% to-transparent to-50%;
+}
+
+.yearCell[data-state='missed'] {
+  @apply border-danger bg-transparent;
+}
+
+.yearCell[data-state='today'] {
+  @apply border-2 border-text-1 bg-transparent;
+}
+
+.yearCell[data-state='planned'] {
+  @apply border-text-2 bg-transparent;
+}
+
+.yearCell[data-state='projected'] {
+  @apply border-dashed border-text-3 bg-transparent;
+}
+
+.yearCell[data-state='off'] {
+  @apply bg-surface-2;
+}
+
+.yearCell_marker {
+  @apply ring-1 ring-warning ring-offset-1 ring-offset-surface-1;
+}
+
+.yearCell_empty,
+.yearCell_outside {
+  @apply cursor-default bg-transparent;
+}

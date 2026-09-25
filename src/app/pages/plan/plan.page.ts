@@ -1,21 +1,30 @@
 import { FormsModule } from '@angular/forms';
 import { CdkDrag, CdkDropList, CdkDropListGroup, type CdkDragDrop } from '@angular/cdk/drag-drop';
-import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { TuiButton, TuiHint } from '@taiga-ui/core';
-import { TuiSwitch } from '@taiga-ui/kit';
+import { TuiSegmented, TuiSwitch } from '@taiga-ui/kit';
+import { CalendarComponent } from './calendar.component';
 import { EmptyStateComponent } from '../../components';
 import { minutesBySection, type IDayPlan, type IPlannedBlock } from '../../domain';
 import { DayShortPipe, MinutesPipe } from '../../pipes';
-import { DataStore, InsightsService, PlanService, ProgramService, UiStateService } from '../../services';
+import { CourseService, DataStore, InsightsService, PlanService, ProgramService, UiStateService } from '../../services';
 import { SESSION_TYPE_LABEL, formatDayShort, formatHours, toDayKey, weekStart, weekdayIndex, weekdayShort } from '../../utils';
 
 const WEEKLY_REVIEW_MARK = 'weeklyReview';
 
-/** План на 7 дней: перетаскивание, пропуск, закрепление, обзор недели (FR-18…FR-21). */
+type TPlanView = 'week' | 'month' | 'year';
+
+const VIEWS: readonly { readonly id: TPlanView; readonly label: string }[] = [
+  { id: 'week', label: 'Неделя' },
+  { id: 'month', label: 'Месяц' },
+  { id: 'year', label: 'Год' },
+];
+
+/** План на 7 дней и календарь всего челленджа (FR-18…FR-21, FR-36). */
 @Component({
   selector: 'app-plan-page',
-  imports: [FormsModule, CdkDropListGroup, CdkDropList, CdkDrag, TuiButton, TuiHint, TuiSwitch, EmptyStateComponent, MinutesPipe, DayShortPipe],
+  imports: [FormsModule, CdkDropListGroup, CdkDropList, CdkDrag, TuiButton, TuiHint, TuiSwitch, TuiSegmented, CalendarComponent, EmptyStateComponent, MinutesPipe, DayShortPipe],
   templateUrl: './plan.page.html',
   styleUrl: './plan.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -26,8 +35,16 @@ export class PlanPage {
   protected readonly ui = inject(UiStateService);
   private readonly insights = inject(InsightsService);
   private readonly program = inject(ProgramService);
+  private readonly course = inject(CourseService);
   protected readonly router = inject(Router);
   protected readonly typeLabel = SESSION_TYPE_LABEL;
+  protected readonly views = VIEWS;
+  protected readonly view = signal<TPlanView>('week');
+  protected readonly viewIndex = computed(() => VIEWS.findIndex((entry) => entry.id === this.view()));
+
+  protected setView(index: number): void {
+    this.view.set(VIEWS[index]?.id ?? 'week');
+  }
 
   protected readonly days = computed(() => this.planner.plan().days);
   protected readonly dayIds = computed(() => this.days().map((day) => `day-${day.date}`));
@@ -66,7 +83,8 @@ export class PlanPage {
   }
 
   protected titleOf(block: IPlannedBlock): string {
-    return block.itemId ? (this.store.tree().itemById.get(block.itemId)?.title ?? '') : 'Свободное творчество';
+    const item = block.itemId ? this.store.tree().itemById.get(block.itemId) : undefined;
+    return item ? this.course.titleOf(item, block.date) : block.itemId ? '' : 'Свободное творчество';
   }
 
   protected colorOf(block: IPlannedBlock): string {
