@@ -1,0 +1,190 @@
+@reference '../../../tailwind.css';
+
+.drawerBackdrop {
+  @apply fixed inset-0 z-40 bg-bg/60;
+  animation: fadeIn var(--duration-base) var(--ease-standard);
+}
+
+.drawer {
+  @apply fixed inset-x-0 bottom-0 z-50 flex top-16 flex-col rounded-t-card border border-border bg-surface-1 shadow-2xl outline-none;
+  @apply md:inset-y-0 md:top-0 md:right-0 md:left-auto md:w-full md:max-w-drawer md:rounded-none md:border-y-0 md:border-r-0;
+  animation: slideUp var(--duration-slow) var(--ease-standard);
+}
+
+@media (width >= 48rem) {
+  .drawer {
+    animation-name: slideIn;
+  }
+}
+
+.drawer__head {
+  @apply flex items-center justify-between gap-3 border-b border-border px-5 py-3;
+}
+
+.drawer__crumbs {
+  @apply flex min-w-0 items-center gap-2 text-meta text-text-2;
+}
+
+.drawer__crumbTopic {
+  @apply truncate;
+}
+
+.drawer__body {
+  @apply flex flex-col gap-5 overflow-y-auto px-5 py-4;
+}
+
+.drawer__title {
+  @apply w-full rounded-control border border-transparent bg-transparent px-1 py-1 text-title font-bold text-text-1 transition-colors duration-(--duration-fast);
+  @apply hover:border-border focus:border-accent focus:outline-none;
+}
+
+.drawer__actions {
+  @apply flex flex-wrap items-center gap-4;
+}
+
+.drawer__done,
+.drawer__switch {
+  @apply flex cursor-pointer items-center gap-2.5 text-body text-text-1;
+}
+
+.drawer__switch {
+  @apply self-end pb-2;
+}
+
+.drawer__block {
+  @apply flex flex-col gap-2;
+}
+
+.drawer__blockHead {
+  @apply flex items-center justify-between;
+}
+
+.drawer__h {
+  @apply m-0;
+}
+
+.drawer__p {
+  @apply m-0;
+}
+
+.drawer__spent {
+  @apply flex items-baseline gap-2;
+}
+
+.drawer__spentValue {
+  @apply text-title font-bold text-text-1;
+}
+
+.drawer__remain {
+  @apply ml-auto text-meta text-text-3;
+}
+
+.drawer__bar {
+  @apply h-1.5 overflow-hidden rounded-full bg-surface-3;
+}
+
+.drawer__barFill {
+  @apply block h-full w-full origin-left rounded-full bg-accent transition-transform duration-(--duration-slow) ease-(--ease-standard);
+}
+
+.drawer__bar_over .drawer__barFill {
+  @apply bg-warning;
+}
+
+.drawer__grid {
+  @apply grid grid-cols-2 gap-3;
+}
+
+.drawer__footer {
+  @apply border-t border-border pt-3;
+}
+
+.refs {
+  @apply m-0 flex list-none flex-col gap-2 p-0;
+}
+
+.refs__row {
+  @apply flex items-center gap-2;
+}
+
+.refs__link {
+  @apply flex min-w-0 flex-1 flex-col text-body text-text-1 underline decoration-border-control underline-offset-2 hover:text-accent;
+}
+
+.refs__meta {
+  @apply text-meta text-text-3 no-underline;
+}
+
+.refs__range {
+  @apply w-28 shrink-0 py-1;
+}
+
+.refs__empty {
+  @apply text-body;
+}
+
+.notesList {
+  @apply m-0 flex list-none flex-col gap-2 p-0;
+}
+
+.notesList__item {
+  @apply flex flex-col gap-2;
+}
+
+.notesList__preview {
+  @apply flex w-full cursor-pointer items-baseline gap-3 rounded-control border-0 bg-surface-2 px-3 py-2 text-left text-body text-text-2 hover:bg-surface-3;
+}
+
+.notesList__date {
+  @apply shrink-0 text-meta text-text-3;
+}
+
+.notesList__text {
+  @apply line-clamp-2;
+}
+
+.compare {
+  @apply grid grid-cols-2 gap-3;
+}
+
+.compare__item {
+  @apply m-0 flex flex-col gap-1;
+}
+
+.compare__img {
+  @apply aspect-square w-full rounded-control object-cover;
+}
+
+.compare__caption {
+  @apply text-meta text-text-3;
+}
+
+.dlgBody {
+  @apply flex flex-col gap-4;
+}
+
+.dlgBody__text {
+  @apply m-0 text-body text-text-2;
+}
+
+.dlgBody__actions {
+  @apply flex flex-wrap justify-end gap-3;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+}
