@@ -1,0 +1,87 @@
+@reference '../tailwind.css';
+
+.boot {
+  @apply flex min-h-dvh items-center justify-center p-4;
+}
+
+.boot__row {
+  @apply grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-3;
+}
+
+.boot__block {
+  @apply h-64;
+}
+
+.boot__block_side {
+  @apply hidden md:block;
+}
+
+.boot__error {
+  @apply max-w-lg rounded-card bg-surface-1 p-5;
+}
+
+.boot__title {
+  @apply mb-2 text-title font-bold;
+}
+
+.boot__text {
+  @apply mb-5 text-text-2;
+}
+
+.boot__actions {
+  @apply flex flex-wrap gap-3;
+}
+
+.shell {
+  @apply flex min-h-dvh;
+}
+
+.shell__main {
+  @apply flex min-w-0 flex-1 flex-col pb-20 xl:pb-0;
+}
+
+.shell_bare .shell__main {
+  @apply pb-0;
+}
+
+.shell__content {
+  @apply mx-auto w-full max-w-content flex-1 px-4 pb-10 md:px-8;
+}
+
+.nav {
+  @apply fixed inset-x-0 bottom-0 z-30 flex justify-around border-t border-border bg-surface-1 px-0.5 py-1;
+  @apply xl:sticky xl:top-0 xl:h-dvh xl:w-rail xl:flex-col xl:justify-start xl:gap-2 xl:border-t-0 xl:border-r xl:px-3 xl:py-5;
+}
+
+.nav__brand {
+  @apply mb-4 hidden items-center justify-center text-accent xl:flex;
+}
+
+.nav__logo {
+  @apply h-9 w-9;
+}
+
+.nav__link {
+  @apply flex min-w-0 flex-1 flex-col items-center gap-0.5 rounded-control px-0 py-1.5 text-text-3 no-underline transition-colors duration-(--duration-base) md:flex-none md:px-4;
+  @apply hover:bg-surface-2 hover:text-text-1 xl:h-12 xl:w-12 xl:justify-center xl:p-0;
+}
+
+.nav__link_active {
+  @apply bg-surface-2 text-accent;
+}
+
+.nav__icon {
+  @apply h-5 w-5;
+}
+
+.nav__label {
+  @apply max-w-full truncate text-micro tracking-tight xl:sr-only;
+}
+
+.topbar {
+  @apply sticky top-0 z-20 flex min-h-16 items-center justify-end bg-bg/90 px-4 py-2 backdrop-blur md:px-8;
+}
+
+.topbar__timer {
+  @apply w-full md:w-auto;
+}

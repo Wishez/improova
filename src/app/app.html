@@ -1,0 +1,70 @@
+<tui-root>
+  @switch (store.status()) {
+    @case ('loading') {
+      <div class="boot" aria-busy="true">
+        <div class="boot__row">
+          <div class="skeleton boot__block"></div>
+          <div class="skeleton boot__block"></div>
+          <div class="skeleton boot__block boot__block_side"></div>
+        </div>
+      </div>
+    }
+    @case ('readError') {
+      <main class="boot">
+        <section class="boot__error" role="alert">
+          <h1 class="boot__title">Не удалось открыть данные</h1>
+          <p class="boot__text">
+            Браузер не дал доступ к хранилищу. Так бывает в приватном окне или когда на диске нет места. Открой обычное
+            окно или освободи место и повтори.
+          </p>
+          <div class="boot__actions">
+            <button tuiButton type="button" size="m" (click)="retry()">Повторить</button>
+            <label tuiButton appearance="flat" size="m">
+              Восстановить из файла копии
+              <input class="visuallyHidden" type="file" accept="application/json,.json" (change)="restore($event)" />
+            </label>
+          </div>
+        </section>
+      </main>
+    }
+    @case ('ready') {
+      <div class="shell" [class.shell_bare]="!store.meta().onboarded">
+        @if (store.meta().onboarded) {
+          <nav class="nav" aria-label="Разделы приложения">
+            <a class="nav__brand" routerLink="/today" aria-label="Импрува — на главную">
+              <svg viewBox="0 0 64 64" class="nav__logo" aria-hidden="true">
+                <path d="M18 46 C24 30 34 20 46 16" stroke="currentColor" stroke-width="6" stroke-linecap="round" fill="none" />
+                <circle cx="46" cy="16" r="5" fill="currentColor" />
+              </svg>
+            </a>
+            @for (link of links; track link.path) {
+              <a class="nav__link" [routerLink]="link.path" routerLinkActive="nav__link_active" [attr.aria-label]="link.label">
+                <tui-icon class="nav__icon" [icon]="link.icon" />
+                <span class="nav__label">{{ link.label }}</span>
+              </a>
+            }
+          </nav>
+        }
+        <div class="shell__main">
+          @if (store.meta().onboarded) {
+            <header class="topbar">
+              <app-mini-timer class="topbar__timer" />
+            </header>
+          }
+          <main class="shell__content">
+            <router-outlet />
+          </main>
+        </div>
+      </div>
+      <app-item-drawer />
+      <app-session-summary />
+      <app-forgotten-dialog />
+      <app-switch-confirm />
+      <app-session-picker />
+      <app-command-palette />
+      <app-focus-overlay />
+      <app-celebration />
+    }
+  }
+  <app-toast-host />
+</tui-root>
