@@ -1,0 +1,92 @@
+<section class="welcome">
+  <header class="welcome__head">
+    <span class="welcome__brand">Импрува</span>
+    <ol class="steps" aria-label="Шаги">
+      @for (index of [1, 2, 3]; track index) {
+        <li class="steps__item" [class.steps__item_active]="step() === index" [class.steps__item_done]="step() > index">{{ index }}</li>
+      }
+    </ol>
+  </header>
+
+  @switch (step()) {
+    @case (1) {
+      <h1 class="pageTitle">Начни с программы</h1>
+      <p class="welcome__lead">Возьми готовую программу или собери свою. План на неделю появится сразу.</p>
+      <div class="choices" role="radiogroup" aria-label="Шаблон программы">
+        @for (option of templates; track option.id) {
+          <button type="button" role="radio" class="choice" [class.choice_active]="template() === option.id" [attr.aria-checked]="template() === option.id" (click)="select(option.id)">
+            <span class="choice__title">{{ option.title }}</span>
+            <span class="choice__body">{{ option.body }}</span>
+          </button>
+        }
+      </div>
+      @if (template() === 'import') {
+        <label tuiButton appearance="secondary" size="m" class="welcome__file">
+          Выбрать файл копии
+          <input class="visuallyHidden" type="file" accept="application/json,.json" (change)="onFile($event)" />
+        </label>
+        @if (importError()) {
+          <p class="field__error" role="alert">{{ importError() }}</p>
+        }
+      } @else {
+        <div class="welcome__actions">
+          <button tuiButton type="button" size="l" (click)="next()">Выбрать программу</button>
+        </div>
+      }
+    }
+    @case (2) {
+      <h1 class="pageTitle">Сколько времени в неделю?</h1>
+      <p class="welcome__lead">Укажи минуты на ресурсы и на практику и отметь дни. Всё можно поменять в настройках.</p>
+      <div class="budget">
+        <label class="field">
+          <span class="field__label">Ресурсы: книги, курсы, видео — мин/нед</span>
+          <input class="input num" type="number" min="0" max="6000" step="10" [value]="budget().studyMinPerWeek" (change)="setMinutes('studyMinPerWeek', $event)" />
+        </label>
+        <label class="field">
+          <span class="field__label">Практика, включая творчество и повторения — мин/нед</span>
+          <input class="input num" type="number" min="0" max="6000" step="10" [value]="budget().practiceMinPerWeek" (change)="setMinutes('practiceMinPerWeek', $event)" />
+        </label>
+      </div>
+      <div class="days">
+        @for (name of weekdays; track name; let index = $index) {
+          <label class="days__day">
+            <span class="days__name">{{ name }}</span>
+            <input class="input num days__input" type="number" min="0" max="720" step="10" [attr.aria-label]="name + ', минут'" [value]="budget().dayCapacity[index]" (change)="setDay(index, $event)" />
+          </label>
+        }
+      </div>
+      <p class="welcome__summary num" [class.welcome__summary_warn]="capacityTotal() < wanted()">
+        Свободно {{ capacityTotal() | minutes }} в неделю, в бюджете {{ wanted() | minutes }}.
+        @if (capacityTotal() < wanted()) {
+          План уменьшим пропорционально.
+        }
+      </p>
+      <div class="welcome__actions">
+        <button tuiButton type="button" size="m" appearance="flat" (click)="step.set(1)">Назад</button>
+        <button tuiButton type="button" size="l" [disabled]="capacityTotal() === 0" (click)="next()">Построить план</button>
+      </div>
+    }
+    @case (3) {
+      <h1 class="pageTitle">План готов</h1>
+      <p class="welcome__lead">Первые дни уже разложены. Пропущенный блок не удваивает следующий день — срок просто сдвигается.</p>
+      <div class="preview">
+        @for (day of firstDays(); track day.date) {
+          <div class="preview__day">
+            <div class="preview__date">{{ day.label }}</div>
+            @for (block of day.blocks; track block.key) {
+              <div class="preview__block">
+                <span class="preview__title">{{ block.title }}</span>
+                <span class="preview__min num">{{ block.minutes }} мин</span>
+              </div>
+            }
+          </div>
+        } @empty {
+          <p class="muted">В программе пока нет топиков — в плане только творчество. Добавь раздел на экране «Программа».</p>
+        }
+      </div>
+      <div class="welcome__actions">
+        <button tuiButton type="button" size="l" (click)="finish()">Начать челлендж</button>
+      </div>
+    }
+  }
+</section>

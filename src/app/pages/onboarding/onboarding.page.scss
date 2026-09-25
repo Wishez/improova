@@ -1,0 +1,113 @@
+@reference '../../../tailwind.css';
+
+.welcome {
+  @apply mx-auto flex max-w-3xl flex-col gap-5 py-10;
+}
+
+.welcome__head {
+  @apply mb-4 flex items-center justify-between;
+}
+
+.welcome__brand {
+  @apply text-lead font-bold text-accent;
+}
+
+.welcome__lead {
+  @apply m-0 max-w-prose text-lead text-text-2;
+}
+
+.welcome__actions {
+  @apply flex flex-wrap justify-end gap-3 pt-2;
+}
+
+.welcome__file {
+  @apply self-start;
+}
+
+.welcome__summary {
+  @apply m-0 text-body text-text-2;
+}
+
+.welcome__summary_warn {
+  @apply text-warning;
+}
+
+.steps {
+  @apply m-0 flex list-none gap-2 p-0;
+}
+
+.steps__item {
+  @apply flex h-8 w-8 items-center justify-center rounded-full border border-border text-meta text-text-3 transition-colors duration-(--duration-base);
+}
+
+.steps__item_active {
+  @apply border-accent bg-accent text-on-accent;
+}
+
+.steps__item_done {
+  @apply border-accent/50 text-accent;
+}
+
+.choices {
+  @apply grid gap-3 md:grid-cols-3;
+}
+
+.choice {
+  @apply flex cursor-pointer flex-col gap-2 rounded-card border border-border bg-surface-1 p-5 text-left transition-colors duration-(--duration-base) hover:border-border-control;
+}
+
+.choice_active {
+  @apply border-accent bg-accent-dim;
+}
+
+.choice__title {
+  @apply text-lead font-semibold text-text-1;
+}
+
+.choice__body {
+  @apply text-body text-text-2;
+}
+
+.budget {
+  @apply grid gap-4 md:grid-cols-2;
+}
+
+.days {
+  @apply grid grid-cols-4 gap-2 md:grid-cols-7;
+}
+
+.days__day {
+  @apply flex flex-col gap-1;
+}
+
+.days__name {
+  @apply text-meta text-text-3;
+}
+
+.days__input {
+  @apply px-2 text-center;
+}
+
+.preview {
+  @apply grid gap-3 md:grid-cols-3;
+}
+
+.preview__day {
+  @apply flex flex-col gap-2 rounded-card bg-surface-1 p-4;
+}
+
+.preview__date {
+  @apply text-meta font-semibold text-text-3 uppercase;
+}
+
+.preview__block {
+  @apply flex items-baseline justify-between gap-3 text-body;
+}
+
+.preview__title {
+  @apply min-w-0 truncate text-text-1;
+}
+
+.preview__min {
+  @apply shrink-0 text-text-3;
+}
