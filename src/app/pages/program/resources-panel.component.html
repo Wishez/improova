@@ -1,0 +1,122 @@
+<ng-template #form>
+  <div class="resForm">
+    <label class="field resForm__wide">
+      <span class="field__label">Название</span>
+      <input class="input" type="text" [value]="draft().title" (input)="patch('title', $event)" />
+    </label>
+    <label class="field">
+      <span class="field__label">Тип</span>
+      <select class="input" (change)="patch('type', $event)">
+        @for (type of types; track type) {
+          <option [value]="type" [selected]="draft().type === type">{{ typeLabel[type] }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span class="field__label">Автор</span>
+      <input class="input" type="text" [value]="draft().author" (input)="patch('author', $event)" />
+    </label>
+    <label class="field resForm__wide">
+      <span class="field__label">Ссылка</span>
+      <input class="input" type="url" placeholder="https://" [value]="draft().url" (input)="patch('url', $event)" />
+    </label>
+    <label class="field">
+      <span class="field__label">Единица</span>
+      <select class="input" (change)="patch('unit', $event)">
+        @for (unit of units; track unit) {
+          <option [value]="unit" [selected]="draft().unit === unit">{{ unitLabel[unit] }}</option>
+        }
+      </select>
+    </label>
+    <label class="field">
+      <span class="field__label">Сколько единиц</span>
+      <input class="input num" type="number" min="0" [value]="draft().unitCount" (input)="patch('unitCount', $event)" />
+    </label>
+    <label class="field">
+      <span class="field__label">Минут на единицу</span>
+      <input class="input num" type="number" min="0" step="0.5" [value]="draft().minPerUnit" (input)="patch('minPerUnit', $event)" />
+      <span class="field__hint">Книга — ~4 мин/стр с конспектом, видео — длительность × 1,5</span>
+    </label>
+    @if (error()) {
+      <span class="field__error resForm__wide" role="alert">{{ error() }}</span>
+    }
+    <div class="resForm__actions resForm__wide">
+      <button tuiButton type="button" size="s" appearance="flat" (click)="editingId.set(null)">Отмена</button>
+      <button tuiButton type="button" size="s" (click)="save()">Сохранить</button>
+    </div>
+  </div>
+</ng-template>
+
+<div class="resources">
+  <div class="resources__bar">
+    <span class="muted">{{ resources().length }} в библиотеке</span>
+    @if (editingId() !== 'new') {
+      <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.plus" (click)="startNew()">Добавить ресурс</button>
+    }
+  </div>
+  @if (editingId() === 'new') {
+    <div class="card"><ng-container [ngTemplateOutlet]="form" /></div>
+  }
+  @if (resources().length === 0 && editingId() !== 'new') {
+    <app-empty-state title="Библиотека пуста" body="Добавь книгу, курс или видео — из них можно собрать топики." cta="Добавить ресурс" (action)="startNew()" />
+  }
+  <ul class="resList">
+    @for (resource of resources(); track resource.id) {
+      <li class="res">
+        @if (editingId() === resource.id) {
+          <ng-container [ngTemplateOutlet]="form" />
+        } @else {
+          <div class="res__main">
+            @if (resource.url) {
+              <a class="res__title" [href]="resource.url" target="_blank" rel="noopener noreferrer">{{ resource.title }}</a>
+            } @else {
+              <span class="res__title">{{ resource.title }}</span>
+            }
+            <span class="res__meta">
+              {{ typeLabel[resource.type] }}{{ resource.author ? ' · ' + resource.author : '' }}
+              @if (resource.unitCount > 0) {
+                · {{ resource.unitCount }} × {{ resource.minPerUnit }} мин ≈ {{ resource.unitCount * resource.minPerUnit | minutes }}
+              }
+              · в топиках: {{ usage().get(resource.id) ?? 0 }}
+            </span>
+          </div>
+          <div class="res__actions">
+            <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.layers" (click)="openSplit(resource)">Разбить на части</button>
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.pencil" (click)="edit(resource)">Изменить</button>
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.trash-2" (click)="remove(resource)">Удалить</button>
+          </div>
+          @if (splitFor() === resource.id) {
+            <div class="split">
+              <label class="field split__topic">
+                <span class="field__label">В тему</span>
+                <select class="input" (change)="patchSplit('topicId', $event)">
+                  @for (topic of topics(); track topic.id) {
+                    <option [value]="topic.id" [selected]="split().topicId === topic.id">{{ topic.label }}</option>
+                  }
+                </select>
+              </label>
+              <label class="field">
+                <span class="field__label">Часть, мин</span>
+                <input class="input num" type="number" min="15" step="5" [value]="split().partMin" (input)="patchSplit('partMin', $event)" />
+              </label>
+              <label class="field">
+                <span class="field__label">Вид</span>
+                <select class="input" (change)="patchSplit('kind', $event)">
+                  <option value="study" [selected]="split().kind === 'study'">Учёба</option>
+                  <option value="practice" [selected]="split().kind === 'practice'">Практика</option>
+                </select>
+              </label>
+              <div class="split__actions">
+                <button tuiButton type="button" size="xs" appearance="flat" (click)="splitFor.set(null)">Отмена</button>
+                <button tuiButton type="button" size="xs" [disabled]="topics().length === 0" (click)="runSplit(resource.id)">Создать топики</button>
+              </div>
+              @if (topics().length === 0) {
+                <span class="field__hint">Сначала добавь тему на вкладке «Разделы».</span>
+              }
+            </div>
+          }
+        }
+      </li>
+    }
+  </ul>
+</div>

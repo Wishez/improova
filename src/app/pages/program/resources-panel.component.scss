@@ -1,0 +1,57 @@
+@reference '../../../tailwind.css';
+
+.resources {
+  @apply flex flex-col gap-3;
+}
+
+.resources__bar {
+  @apply flex items-center justify-between;
+}
+
+.resList {
+  @apply m-0 flex list-none flex-col gap-2 p-0;
+}
+
+.res {
+  @apply flex flex-wrap items-center gap-3 rounded-card bg-surface-1 px-4 py-3;
+}
+
+.res__main {
+  @apply flex min-w-0 flex-1 flex-col gap-0.5;
+}
+
+.res__title {
+  @apply truncate text-body font-semibold text-text-1 no-underline hover:text-accent;
+}
+
+.res__meta {
+  @apply text-meta text-text-3;
+}
+
+.res__actions {
+  @apply flex shrink-0 items-center gap-1;
+}
+
+.resForm {
+  @apply grid w-full gap-3 md:grid-cols-3;
+}
+
+.resForm__wide {
+  @apply md:col-span-3;
+}
+
+.resForm__actions {
+  @apply flex justify-end gap-2;
+}
+
+.split {
+  @apply grid w-full gap-3 rounded-control bg-surface-2 p-3 md:grid-cols-4;
+}
+
+.split__topic {
+  @apply md:col-span-2;
+}
+
+.split__actions {
+  @apply flex items-end justify-end gap-2;
+}
