@@ -9,7 +9,7 @@
 }
 
 .group {
-  @apply flex flex-col gap-4;
+  @apply flex min-w-0 flex-col gap-4;
 }
 
 .group__text {
@@ -78,4 +78,41 @@
 
 .dlgBody {
   @apply flex flex-col gap-4;
+}
+
+.quarters {
+  @apply min-w-0 gap-2 border-t border-border pt-4;
+}
+
+.quarters__scroll {
+  @apply max-w-full overflow-x-auto;
+}
+
+.quarters__table {
+  @apply w-full border-collapse text-meta text-text-2;
+
+  th,
+  td {
+    @apply px-2 py-1 text-left font-normal;
+  }
+}
+
+.quarters__now {
+  @apply text-text-1;
+}
+
+.quarters__select {
+  @apply w-16 py-1;
+}
+
+.coursePanel {
+  @apply flex flex-col gap-2 rounded-control bg-surface-2 p-3;
+}
+
+.coursePanel__missing {
+  @apply text-meta text-text-2;
+
+  summary {
+    @apply cursor-pointer;
+  }
 }

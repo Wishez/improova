@@ -5,7 +5,7 @@ import { TuiProgress } from '@taiga-ui/kit';
 import { EmptyStateComponent } from '../../components';
 import { progressOfItems, sectionItems, weeklyPlan, type IPlannedBlock, type ITip } from '../../domain';
 import { ClockTimePipe, DayShortPipe, MarkdownPipe, MinutesPipe } from '../../pipes';
-import { BackupService, DataStore, InsightsService, PlanService, ProgramService, TimerService, UiStateService } from '../../services';
+import { BackupService, CourseService, DataStore, InsightsService, PlanService, ProgramService, TimerService, UiStateService } from '../../services';
 import type { ITimeLog } from '../../types';
 import { SESSION_TYPE_LABEL, diffDays, formatDayShort, toDayKey, weekStart, weekdayAccusative, weekdayIndex, weekdayShort } from '../../utils';
 
@@ -27,6 +27,7 @@ export class TodayPage {
   protected readonly insights = inject(InsightsService);
   protected readonly backup = inject(BackupService);
   private readonly program = inject(ProgramService);
+  private readonly course = inject(CourseService);
   protected readonly router = inject(Router);
 
   protected readonly typeLabel = SESSION_TYPE_LABEL;
@@ -112,7 +113,12 @@ export class TodayPage {
     if (!block.itemId) {
       return 'Свободное творчество';
     }
-    return this.store.tree().itemById.get(block.itemId)?.title ?? 'Топик в архиве';
+    const item = this.store.tree().itemById.get(block.itemId);
+    if (!item) {
+      return 'Топик в архиве';
+    }
+    // Лог показывает название, под которым сессия прошла; блок плана — топик маршрута своей недели
+    return 'date' in block ? this.course.titleOf(item, block.date) : item.title;
   }
 
   protected sectionOf(block: IPlannedBlock): { readonly title: string; readonly color: string } {

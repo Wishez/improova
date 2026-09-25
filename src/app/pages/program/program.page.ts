@@ -12,6 +12,7 @@ import { MarkdownPipe, MinutesPipe } from '../../pipes';
 import { DataStore, ProgramService, UiStateService, parseBulkLines, type TProgramEntity } from '../../services';
 import type { IItem, ISection, ITopic, TSectionWeight } from '../../types';
 import { ResourcesPanelComponent } from './resources-panel.component';
+import { RoutePanelComponent } from './route-panel.component';
 
 type TFilter = 'all' | 'inProgress' | 'todo' | 'done' | 'weak';
 
@@ -51,7 +52,7 @@ const FILTERS: readonly { readonly id: TFilter; readonly label: string }[] = [
     EmptyStateComponent,
     MinutesPipe,
     MarkdownPipe,
-    ResourcesPanelComponent,
+    ResourcesPanelComponent, RoutePanelComponent,
   ],
   templateUrl: './program.page.html',
   styleUrl: './program.page.scss',
@@ -64,7 +65,7 @@ export class ProgramPage {
   private readonly focusSection = toSignal(inject(ActivatedRoute).queryParamMap.pipe(map((params) => params.get('section'))));
 
   protected readonly filters = FILTERS;
-  protected readonly tab = signal<'program' | 'resources'>('program');
+  protected readonly tab = signal<'program' | 'resources' | 'route'>('program');
   protected readonly filter = signal<TFilter>('all');
   protected readonly query = signal('');
   protected readonly editing = signal<{ readonly kind: TProgramEntity; readonly id: string } | null>(null);

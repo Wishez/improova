@@ -4,8 +4,8 @@ import { TuiButton, TuiDialog } from '@taiga-ui/core';
 import { TuiSwitch } from '@taiga-ui/kit';
 import type { TTipId } from '../../domain';
 import { MinutesPipe } from '../../pipes';
-import { BackupService, DataStore, type TImportCheck } from '../../services';
-import type { IBudget, ISnapshot } from '../../types';
+import { BackupService, CourseService, DataStore, ToastService, type ICoursePreview, type TImportCheck } from '../../services';
+import type { IBudget, ISection, ISnapshot, TSectionWeight } from '../../types';
 import { addDays, deviceTimeZone, diffDays, isValidDayKey, isValidTimeZone, weekdayShort } from '../../utils';
 
 const TIP_TOGGLES: readonly { readonly id: TTipId; readonly label: string }[] = [
@@ -28,6 +28,15 @@ const TIP_TOGGLES: readonly { readonly id: TTipId; readonly label: string }[] = 
 export class SettingsPage {
   protected readonly store = inject(DataStore);
   protected readonly backup = inject(BackupService);
+  protected readonly course = inject(CourseService);
+  private readonly toasts = inject(ToastService);
+  protected readonly sections = computed(() =>
+    this.store
+      .data()
+      .sections.filter((section) => !section.archived)
+      .sort((a, b) => a.order - b.order),
+  );
+  protected readonly coursePreview = signal<ICoursePreview | null>(null);
 
   protected readonly budget = this.store.budget;
   protected readonly settings = this.store.settings;
@@ -56,7 +65,7 @@ export class SettingsPage {
     this.errors.update((errors) => ({ ...errors, [key]: message }));
   }
 
-  private saveBudget(patch: Partial<IBudget>): void {
+  protected saveBudget(patch: Partial<IBudget>): void {
     this.store.upsert('budgets', { ...this.budget(), ...patch, updatedAt: new Date().toISOString() });
   }
 
@@ -210,5 +219,26 @@ export class SettingsPage {
 
   protected formatBytes(bytes: number): string {
     return bytes >= 1_048_576 ? `${(bytes / 1_048_576).toFixed(1).replace('.', ',')} МБ` : `${Math.round(bytes / 1024)} КБ`;
+  }
+
+  /** Вес раздела в квартале (FR-40): при первой правке недостающие кварталы берут общий вес. */
+  protected setQuarterWeight(section: ISection, quarter: number, event: Event): void {
+    const value = Number(event.target instanceof HTMLSelectElement ? event.target.value : Number.NaN);
+    if (value !== 1 && value !== 2 && value !== 3) {
+      return;
+    }
+    const weights: TSectionWeight[] = [0, 1, 2, 3].map((index) => section.quarterWeights?.[index] ?? section.weight);
+    weights[quarter] = value;
+    this.store.upsert('sections', { ...section, quarterWeights: weights, updatedAt: new Date().toISOString() });
+  }
+
+  protected previewCourse(): void {
+    this.coursePreview.set(this.course.preview());
+  }
+
+  protected applyCourse(): void {
+    const result = this.course.apply();
+    this.coursePreview.set(null);
+    this.toasts.show({ text: `Ориентиры добавлены в ${result.matched} топиков`, kind: 'success' });
   }
 }

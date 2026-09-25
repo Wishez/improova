@@ -1,0 +1,62 @@
+<section class="route" aria-labelledby="route-title">
+  <div class="route__bar">
+    <div>
+      <h2 id="route-title" class="card__title route__h">Маршрут по мастерам</h2>
+      <p class="muted route__p num">Неделя челленджа {{ course.week() }}. Нечётная неделя блока — первый художник, чётная — второй; копия — в первую неделю блока.</p>
+    </div>
+    <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.plus" (click)="course.addBlock()">Блок</button>
+  </div>
+
+  @for (block of blocks(); track block.id; let index = $index) {
+    <article class="rBlock" [class.rBlock_current]="block.id === currentId()">
+      <header class="rBlock__head">
+        <span class="rBlock__num">Блок {{ index + 1 }}</span>
+        <label class="rBlock__weeks">
+          <span class="field__label">Недели</span>
+          <input class="input rBlock__week num" type="number" min="1" aria-label="С недели" [value]="block.fromWeek" (change)="setWeeks(block, 'fromWeek', $event)" />
+          <span class="muted">–</span>
+          <input class="input rBlock__week num" type="number" min="1" aria-label="По неделю" [value]="block.toWeek" (change)="setWeeks(block, 'toWeek', $event)" />
+        </label>
+        @if (block.id === currentId()) {
+          <span class="rBlock__badge">сейчас</span>
+        }
+        <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.trash-2" class="rBlock__remove" (click)="course.removeBlock(block.id)">Удалить блок</button>
+      </header>
+      @if (overlaps().has(block.id)) {
+        <p class="field__error rBlock__error" role="alert">Недели пересекаются с другим блоком — художник недели возьмётся из первого по порядку.</p>
+      }
+      <div class="rBlock__artists">
+        @for (position of [0, 1]; track position) {
+          <fieldset class="rArtist">
+            <legend class="field__label">{{ position === 0 ? 'Нечётные недели' : 'Чётные недели' }}</legend>
+            <input class="input" type="text" aria-label="Художник" placeholder="Художник" [value]="artist(block, position).name" (change)="setArtist(block, position, { name: text($event).trim() })" />
+            <input class="input" type="url" aria-label="Подборка работ" placeholder="https:// — подборка работ" [value]="artist(block, position).url" (change)="setArtist(block, position, { url: text($event).trim() })" />
+            <input class="input" type="text" aria-label="Что забираешь" placeholder="Что забираешь" [value]="artist(block, position).takeaway" (change)="setArtist(block, position, { takeaway: text($event).trim() })" />
+            <input class="input" type="text" aria-label="Что смотреть" placeholder="Работы для просмотра" [value]="artist(block, position).works" (change)="setArtist(block, position, { works: text($event).trim() })" />
+          </fieldset>
+        }
+      </div>
+      <div class="rBlock__copy">
+        <label class="field rBlock__grow">
+          <span class="field__label">Копия блока</span>
+          <input class="input" type="text" [value]="block.copyTask" (change)="setText(block, 'copyTask', $event)" />
+        </label>
+        <label class="field">
+          <span class="field__label">Техника</span>
+          <input class="input" type="text" [value]="block.copyTechnique" (change)="setText(block, 'copyTechnique', $event)" />
+        </label>
+      </div>
+    </article>
+  } @empty {
+    <p class="muted route__p">Маршрута нет. Добавь блок вручную или примени ориентиры курса в «Настройки → Данные».</p>
+  }
+
+  <details class="route__questions">
+    <summary>Вопросы к анализу — одинаковы для всех художников</summary>
+    <ol>
+      @for (question of questions; track question) {
+        <li>{{ question }}</li>
+      }
+    </ol>
+  </details>
+</section>

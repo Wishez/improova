@@ -1,5 +1,6 @@
 export * from './backup.service';
 export * from './clock.service';
+export * from './course.service';
 export * from './data.store';
 export * from './insights.service';
 export * from './logs.service';

@@ -3,11 +3,14 @@
   <div class="tabs" role="tablist">
     <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'program'" [attr.aria-selected]="tab() === 'program'" (click)="tab.set('program')">Разделы</button>
     <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'resources'" [attr.aria-selected]="tab() === 'resources'" (click)="tab.set('resources')">Ресурсы</button>
+    <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'route'" [attr.aria-selected]="tab() === 'route'" (click)="tab.set('route')">Маршрут</button>
   </div>
 </header>
 
 @if (tab() === 'resources') {
   <app-resources-panel />
+} @else if (tab() === 'route') {
+  <app-route-panel />
 } @else {
   <div class="toolbar">
     <tui-segmented size="s" class="toolbar__filter" [activeItemIndex]="filterIndex()" (activeItemIndexChange)="setFilter($event)">

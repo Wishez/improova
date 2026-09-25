@@ -60,6 +60,43 @@
     @if (errors()['blocks'] || errors()['intervals']) {
       <span class="field__error" role="alert">{{ errors()['blocks'] || errors()['intervals'] }}</span>
     }
+    <div class="field quarters">
+      <label class="toggle">
+        <input tuiSwitch type="checkbox" size="s" [ngModel]="budget().seasonalWeights" (ngModelChange)="saveBudget({ seasonalWeights: $event })" />
+        <span>Веса разделов по кварталам</span>
+      </label>
+      <span class="field__hint num">Сейчас неделя {{ course.week() }}, квартал Q{{ course.quarter() }}. Выключено — один вес на весь год, как в плане v1.1.</span>
+      @if (budget().seasonalWeights) {
+        <div class="quarters__scroll">
+          <table class="quarters__table">
+            <thead>
+              <tr>
+                <th scope="col">Раздел</th>
+                @for (quarter of [1, 2, 3, 4]; track quarter) {
+                  <th scope="col" [class.quarters__now]="quarter === course.quarter()">Q{{ quarter }}</th>
+                }
+              </tr>
+            </thead>
+            <tbody>
+              @for (section of sections(); track section.id) {
+                <tr>
+                  <th scope="row">{{ section.title }}</th>
+                  @for (quarter of [0, 1, 2, 3]; track quarter) {
+                    <td [class.quarters__now]="quarter + 1 === course.quarter()">
+                      <select class="input quarters__select" [attr.aria-label]="section.title + ', Q' + (quarter + 1)" (change)="setQuarterWeight(section, quarter, $event)">
+                        @for (weight of [1, 2, 3]; track weight) {
+                          <option [value]="weight" [selected]="(section.quarterWeights?.[quarter] ?? section.weight) === weight">{{ weight }}</option>
+                        }
+                      </select>
+                    </td>
+                  }
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </div>
   </section>
 
   <section class="card group" aria-labelledby="challenge-title">
@@ -156,6 +193,41 @@
         Импорт из файла
         <input class="visuallyHidden" type="file" accept="application/json,.json" (change)="onImportFile($event)" />
       </label>
+    </div>
+    <div class="coursePanel">
+      <p class="group__text">
+        <strong>Ориентиры курса.</strong> Добавляет цели, шаги, ссылки и маршрут по мастерам в топики стартовой программы.
+        Заполняются только пустые ориентиры — прогресс, логи, заметки и оценки не меняются. Запуск можно повторить.
+      </p>
+      @if (coursePreview(); as preview) {
+        <p class="group__text num">
+          Будет заполнено {{ preview.matched }}, свой ориентир уже есть у {{ preview.kept }}, не найдено {{ preview.notFound.length }}.
+          @if (preview.routeBlocks > 0) {
+            Маршрут по мастерам: {{ preview.routeBlocks }} блоков.
+          }
+          @if (preview.sectionWeights > 0) {
+            Квартальные веса: {{ preview.sectionWeights }} разделов.
+          }
+        </p>
+        @if (preview.notFound.length > 0) {
+          <details class="coursePanel__missing">
+            <summary>Не найдены в программе</summary>
+            <ul>
+              @for (path of preview.notFound; track path) {
+                <li>{{ path }}</li>
+              }
+            </ul>
+          </details>
+        }
+        <div class="buttons">
+          <button tuiButton type="button" size="s" appearance="flat" (click)="coursePreview.set(null)">Отмена</button>
+          <button tuiButton type="button" size="s" [disabled]="preview.matched + preview.routeBlocks + preview.sectionWeights === 0" (click)="applyCourse()">Добавить</button>
+        </div>
+      } @else {
+        <div class="buttons">
+          <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.sparkles" (click)="previewCourse()">Добавить ориентиры курса</button>
+        </div>
+      }
     </div>
     @if (importError()) {
       <p class="field__error" role="alert">{{ importError() }}</p>

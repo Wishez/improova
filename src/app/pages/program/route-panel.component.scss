@@ -1,0 +1,77 @@
+@reference '../../../tailwind.css';
+
+.route {
+  @apply flex flex-col gap-3;
+}
+
+.route__bar {
+  @apply flex flex-wrap items-start justify-between gap-3;
+}
+
+.route__h {
+  @apply m-0;
+}
+
+.route__p {
+  @apply m-0 mt-1 text-meta;
+}
+
+.route__questions {
+  @apply rounded-card bg-surface-1 px-4 py-3 text-meta text-text-2;
+
+  summary {
+    @apply cursor-pointer text-text-1;
+  }
+}
+
+.rBlock {
+  @apply flex flex-col gap-3 rounded-card border border-transparent bg-surface-1 p-4;
+}
+
+.rBlock_current {
+  @apply border-accent/40;
+}
+
+.rBlock__head {
+  @apply flex flex-wrap items-center gap-3;
+}
+
+.rBlock__num {
+  @apply text-body font-semibold text-text-1;
+}
+
+.rBlock__weeks {
+  @apply flex items-center gap-2;
+}
+
+.rBlock__week {
+  @apply w-16;
+}
+
+.rBlock__badge {
+  @apply rounded-control bg-accent-dim px-2 py-0.5 text-micro text-accent;
+}
+
+.rBlock__remove {
+  @apply ml-auto;
+}
+
+.rBlock__error {
+  @apply m-0;
+}
+
+.rBlock__artists {
+  @apply grid grid-cols-1 gap-3 md:grid-cols-2;
+}
+
+.rArtist {
+  @apply m-0 flex min-w-0 flex-col gap-2 border-0 p-0;
+}
+
+.rBlock__copy {
+  @apply flex flex-wrap gap-3;
+}
+
+.rBlock__grow {
+  @apply min-w-0 flex-1;
+}

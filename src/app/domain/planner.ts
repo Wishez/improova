@@ -51,6 +51,8 @@ export interface IPlannerInput {
   readonly logs: readonly ITimeLog[];
   readonly blocks: readonly IPlanBlock[];
   readonly boundaryHour: number;
+  /** Веса разделов этой недели (FR-40); по умолчанию — вес раздела. */
+  readonly sectionWeights?: ReadonlyMap<string, number>;
 }
 
 interface IWeekCounters {
@@ -354,6 +356,7 @@ export function planWeek(input: IPlannerInput): IPlanResult {
         allocated: allocated[kind],
         allocatedTotal: allocatedTotal[kind],
         previousSection,
+        sectionWeights: input.sectionWeights,
         isBlocked: (itemId) =>
           skipped.has(`${day}|${itemId}`) || (itemBlocksToday.get(itemId) ?? 0) >= MAX_ITEM_BLOCKS_PER_DAY,
       });
@@ -411,6 +414,7 @@ function pickCandidate(params: {
   readonly allocatedTotal: number;
   readonly previousSection: string | null;
   readonly isBlocked: (itemId: string) => boolean;
+  readonly sectionWeights: ReadonlyMap<string, number> | undefined;
 }): ICandidate | null {
   const fronts = new Map<string, ICandidate>();
   for (const candidate of params.candidates) {
@@ -432,7 +436,8 @@ function pickCandidate(params: {
   const weightOf = (sectionId: string): number => {
     const section = params.tree.sectionById.get(sectionId);
     const weak = fronts.get(sectionId)?.item.weakSpot ? 1 : 0;
-    return (section?.weight ?? 1) * (1 + 0.5 * weak);
+    const base = params.sectionWeights?.get(sectionId) ?? section?.weight ?? 1;
+    return base * (1 + 0.5 * weak);
   };
   const totalWeight = [...fronts.keys()].reduce((sum, id) => sum + weightOf(id), 0);
   const ranked = [...fronts.values()]
