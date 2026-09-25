@@ -1,0 +1,135 @@
+@reference '../../../tailwind.css';
+
+.head {
+  @apply flex flex-wrap items-center justify-between gap-4 pt-2 pb-4;
+}
+
+.stats {
+  @apply grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-12;
+}
+
+.stats__main {
+  @apply flex flex-col gap-4 md:col-span-2 xl:col-span-5;
+}
+
+.stats__center {
+  @apply flex flex-col gap-4 xl:col-span-4;
+}
+
+.stats__side {
+  @apply flex flex-col gap-4 xl:col-span-3;
+}
+
+.chartHead {
+  @apply flex items-center justify-between;
+}
+
+.chartHead__title {
+  @apply mb-0;
+}
+
+.legend {
+  @apply flex items-center gap-1.5 text-meta text-text-3;
+}
+
+.legend__dot {
+  @apply ml-2 inline-block h-2 w-2 rounded-full;
+}
+
+.legend__dot_plan {
+  @apply bg-surface-3;
+}
+
+.legend__dot_fact {
+  @apply bg-accent;
+}
+
+.chart {
+  @apply mt-4 flex flex-col gap-2;
+}
+
+.chart__area {
+  @apply flex h-48;
+}
+
+.chart__bars {
+  @apply flex-1;
+  --tui-chart-categorical-00: var(--color-surface-3);
+  --tui-chart-categorical-01: var(--color-accent);
+}
+
+.chart__labels {
+  @apply flex;
+}
+
+.chart__label {
+  @apply min-w-0 flex-1 cursor-pointer truncate border-0 bg-transparent px-0 py-1 text-center text-micro text-text-3 hover:text-text-1;
+}
+
+.chart__label_active {
+  @apply text-accent;
+}
+
+.selected {
+  @apply mt-4 flex flex-col gap-2 border-t border-border pt-3;
+}
+
+.selected__head {
+  @apply text-body text-text-2;
+}
+
+.metrics {
+  @apply m-0 flex flex-col gap-2;
+}
+
+.metrics__row {
+  @apply flex items-baseline justify-between gap-3 text-body text-text-2;
+
+  dd {
+    @apply m-0 text-text-1;
+  }
+}
+
+.metrics__row_main {
+  @apply text-lead;
+
+  dd {
+    @apply text-title font-bold text-accent;
+  }
+}
+
+.metrics__warn {
+  @apply text-warning;
+}
+
+.forecast__main {
+  @apply m-0 mb-1 text-lead font-semibold text-text-1;
+}
+
+.etas {
+  @apply m-0 mt-3 flex list-none flex-col gap-1 p-0;
+}
+
+.etas__row {
+  @apply flex justify-between gap-3 text-meta text-text-2;
+}
+
+.ringBox {
+  @apply flex justify-center py-2;
+}
+
+.shares {
+  @apply m-0 flex list-none flex-col gap-1.5 p-0;
+}
+
+.shares__row {
+  @apply flex items-center gap-2 text-meta text-text-2;
+}
+
+.shares__dot {
+  @apply h-2 w-2 shrink-0 rounded-full;
+}
+
+.shares__title {
+  @apply flex-1 truncate;
+}

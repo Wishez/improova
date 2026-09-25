@@ -1,0 +1,149 @@
+<header class="head">
+  <h1 class="pageTitle">Статистика</h1>
+  <tui-segmented size="s" [activeItemIndex]="periodIndex()" (activeItemIndexChange)="setPeriod($event)">
+    @for (entry of periods; track entry.id) {
+      <button type="button">{{ entry.label }}</button>
+    }
+  </tui-segmented>
+</header>
+
+@if (!hasLogs()) {
+  <app-empty-state
+    title="Статистика появится после первой сессии"
+    body="Запусти таймер на любом топике — часы, разделы и активность начнут считаться сразу."
+    cta="Начать сессию"
+    (action)="ui.pickerOpen.set('practice')"
+  />
+} @else {
+  <div class="stats">
+    <section class="stats__main">
+      <div class="card">
+        <div class="chartHead">
+          <h2 class="card__title chartHead__title">План и факт</h2>
+          <span class="legend"><span class="legend__dot legend__dot_plan"></span>план <span class="legend__dot legend__dot_fact"></span>факт</span>
+        </div>
+        <div class="chart">
+          <div class="chart__area">
+            <tui-bar-chart class="chart__bars" [max]="chartMax()" [value]="chartValue()" (tapColumn)="tap($event)" />
+          </div>
+          <div class="chart__labels">
+            @for (column of columns(); track column.from; let index = $index) {
+              <button type="button" class="chart__label" [class.chart__label_active]="selected() === index" (click)="tap(index)">{{ column.label }}</button>
+            }
+          </div>
+        </div>
+        @if (selectedColumn(); as column) {
+          <div class="selected">
+            <div class="selected__head">
+              <span class="num">{{ column.from | dayShort }}{{ column.to !== column.from ? ' – ' + (column.to | dayShort) : '' }}: {{ column.fact | minutes }} из {{ column.plan | minutes }}</span>
+            </div>
+            <app-log-list [logs]="selectedLogs()" [showItem]="true" />
+          </div>
+        } @else {
+          <p class="field__hint">Нажми на столбец — покажем сессии за период.</p>
+        }
+      </div>
+
+      <div class="card">
+        <h2 class="card__title">Метрики</h2>
+        <dl class="metrics">
+          <div class="metrics__row metrics__row_main">
+            <dt>Выполнение плана недели</dt>
+            <dd class="num">{{ insights.metrics().northStar | percent100 }}</dd>
+          </div>
+          <div class="metrics__row">
+            <dt>Недели в ритме (≥ 80 %)</dt>
+            <dd class="num">{{ insights.metrics().weeksInRhythm | percent100 }} · подряд {{ insights.metrics().rhythmStreak }}</dd>
+          </div>
+          <div class="metrics__row">
+            <dt>Сессии с рефлексией</dt>
+            <dd class="num">{{ insights.metrics().reflection | percent100 }}</dd>
+          </div>
+          <div class="metrics__row">
+            <dt>Учёба / творчество</dt>
+            <dd class="num">{{ insights.metrics().balance | percent100 }}</dd>
+          </div>
+          <div class="metrics__row">
+            <dt>Повторения вовремя</dt>
+            <dd class="num">{{ insights.metrics().reviewsOnTime | percent100 }}</dd>
+          </div>
+          <div class="metrics__row">
+            <dt>Спад активности за 4 недели</dt>
+            <dd class="num" [class.metrics__warn]="(insights.metrics().burnoutDrop ?? 0) > 0.3">{{ insights.metrics().burnoutDrop | percent100 }}</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="stats__center">
+      <div class="card">
+        <h2 class="card__title">Активность за год</h2>
+        <app-heatmap [byDay]="byDay()" [today]="store.today()" />
+      </div>
+      <div class="card">
+        <h2 class="card__title">Прогноз</h2>
+        <p class="forecast__main num">
+          @if (insights.forecast().remainingMin === 0) {
+            Программа пройдена
+          } @else if (insights.forecast().eta; as eta) {
+            Программа закончится {{ eta | dayShort: true }}
+          } @else {
+            Недостаточно данных для прогноза
+          }
+        </p>
+        <p class="field__hint">
+          {{ insights.forecast().basedOnFact ? 'По фактическому темпу за 4 недели' : 'Прогноз по бюджету. По факту — через ' + weeksToFact() + ' нед.' }} · осталось {{ insights.forecast().remainingMin | minutes }}
+        </p>
+        <ul class="etas">
+          @for (entry of sectionEtas(); track entry.id) {
+            <li class="etas__row"><span>{{ entry.title }}</span><span class="muted num">{{ entry.eta ? (entry.eta | dayShort: true) : '—' }}</span></li>
+          }
+        </ul>
+      </div>
+    </section>
+
+    <aside class="stats__side">
+      <div class="card">
+        <h2 class="card__title">По разделам</h2>
+        <div class="ringBox" [style]="ringStyle()">
+          <tui-ring-chart size="m" [value]="ringValue()">
+            <span class="num">{{ ringTotal() | minutes }}</span>
+          </tui-ring-chart>
+        </div>
+        <ul class="shares">
+          @for (entry of bySection(); track entry.id) {
+            <li class="shares__row">
+              <span class="sectionDot" [class]="'sectionDot ' + (entry.color ? 'sectionDot_' + entry.color : 'sectionDot_none')"></span>
+              <span class="shares__title">{{ entry.title }}</span>
+              <span class="muted num">{{ entry.minutes | minutes }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+      <div class="card">
+        <h2 class="card__title">По типам</h2>
+        <ul class="shares">
+          @for (entry of byType(); track entry.type) {
+            <li class="shares__row">
+              <span class="shares__title">{{ typeLabel[entry.type] }}</span>
+              <span class="muted num">{{ entry.minutes | minutes }} · {{ entry.share | percent100 }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+      <div class="card">
+        <h2 class="card__title">Точность оценок</h2>
+        <ul class="shares">
+          @for (entry of accuracy(); track entry.type) {
+            <li class="shares__row">
+              <span class="shares__title">{{ resourceTypeLabel[entry.type] }}</span>
+              <span class="muted num">факт/оценка {{ entry.ratio.toFixed(2).replace('.', ',') }} · {{ entry.count }}</span>
+            </li>
+          } @empty {
+            <li class="muted">Появится после первых закрытых топиков.</li>
+          }
+        </ul>
+      </div>
+    </aside>
+  </div>
+}
