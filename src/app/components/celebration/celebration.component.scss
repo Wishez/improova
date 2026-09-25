@@ -1,0 +1,45 @@
+@reference '../../../tailwind.css';
+
+.celebration {
+  @apply fixed top-20 left-1/2 z-70 flex -translate-x-1/2 items-center gap-3 rounded-card border border-success/50 bg-surface-2 px-5 py-3 shadow-lg;
+  animation: celebrate 1.2s var(--ease-standard);
+}
+
+.celebration__ring {
+  @apply flex h-10 w-10 items-center justify-center rounded-full bg-success/15 text-success;
+  animation: glow 1.2s var(--ease-standard);
+}
+
+.celebration__label {
+  @apply text-meta text-text-3 uppercase;
+}
+
+.celebration__title {
+  @apply text-lead font-semibold text-text-1;
+}
+
+@keyframes celebrate {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -0.75rem) scale(0.96);
+  }
+
+  40% {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1.02);
+  }
+
+  100% {
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 0 0 rgb(91 214 143 / 0.6);
+  }
+
+  100% {
+    box-shadow: 0 0 0 1rem rgb(91 214 143 / 0);
+  }
+}
