@@ -30,9 +30,11 @@ export const COLLECTIONS: readonly TCollection[] = [
   'notes',
   'assets',
   'meta',
+  'routeBlocks',
 ];
 
-export const SCHEMA_VERSION = 1;
+/** 2 — ориентиры, маршрут мастеров и квартальные веса (релиз 1.2). */
+export const SCHEMA_VERSION = 2;
 
 export function emptyCollections(): ICollections {
   return {
@@ -47,6 +49,7 @@ export function emptyCollections(): ICollections {
     notes: [],
     assets: [],
     meta: [],
+    routeBlocks: [],
   };
 }
 

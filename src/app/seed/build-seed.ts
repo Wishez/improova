@@ -1,12 +1,13 @@
-import type { IItem, IResource, ISection, ITopic } from '../types';
+import type { IItem, IResource, IRouteBlock, ISection, ITopic } from '../types';
 import { createId } from '../utils';
-import { SEED_RESOURCES, SEED_SECTIONS } from './program.seed';
+import { SEED_RESOURCES, SEED_ROUTE, SEED_SECTIONS } from './program.seed';
 
 export interface ISeedResult {
   readonly sections: ISection[];
   readonly topics: ITopic[];
   readonly items: IItem[];
   readonly resources: IResource[];
+  readonly routeBlocks: IRouteBlock[];
 }
 
 /** Создаёт стартовую программу с новыми id (ТЗ 9, FR-01). */
@@ -44,6 +45,7 @@ export function buildSeed(nowIso: string): ISeedResult {
       order: sectionIndex,
       weight: seedSection.weight,
       archived: false,
+      quarterWeights: [...seedSection.quarterWeights],
     });
     seedSection.topics.forEach((seedTopic, topicIndex) => {
       const topicId = createId();
@@ -82,9 +84,22 @@ export function buildSeed(nowIso: string): ISeedResult {
           order: itemIndex,
           doneAt: null,
           archived: false,
+          guide: seedItem.guide,
+          routeRole: seedItem.routeRole ?? null,
         });
       });
     });
   });
-  return { sections, topics, items, resources };
+  const routeBlocks: IRouteBlock[] = SEED_ROUTE.map((block, index) => ({
+    ...base,
+    id: createId(),
+    order: index,
+    fromWeek: block.fromWeek,
+    toWeek: block.toWeek,
+    artists: block.artists,
+    copyTask: block.copyTask,
+    copyTechnique: block.copyTechnique,
+    links: [],
+  }));
+  return { sections, topics, items, resources, routeBlocks };
 }

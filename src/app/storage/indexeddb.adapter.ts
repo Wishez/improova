@@ -10,7 +10,8 @@ import {
 } from './storage-adapter';
 
 const DB_NAME = 'improva';
-const DB_VERSION = 1;
+/** 2 — хранилище routeBlocks. */
+const DB_VERSION = 2;
 
 /** Хранилище по умолчанию: IndexedDB браузера, работает офлайн. */
 export class IndexedDbAdapter implements IStorageAdapter {

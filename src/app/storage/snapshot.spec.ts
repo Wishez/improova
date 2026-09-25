@@ -36,6 +36,31 @@ describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
     expect(await target.loadAll()).toEqual(await source.loadAll());
   });
 
+  it('файл v1 мигрирует в v2: поля ориентира и весов добавляются по умолчанию (FR-42)', () => {
+    const { guide: _guide, routeRole: _role, ...legacyItem } = itemFixture({ id: 'a', topicId: 't' });
+    const { seasonalWeights: _seasonal, ...legacyBudget } = budgetFixture();
+    const file = { app: 'improva', kind: 'full', schemaVersion: 1, exportedAt: '', data: { items: [legacyItem], budgets: [legacyBudget] } };
+    const check = checkSnapshot(JSON.stringify(file));
+    expect(check.ok).toBe(true);
+    if (check.ok) {
+      expect(check.snapshot.schemaVersion).toBe(2);
+      expect(check.snapshot.data.items?.[0]).toMatchObject({ guide: null, routeRole: null });
+      expect(check.snapshot.data.budgets?.[0]?.seasonalWeights).toBe(false);
+      expect(check.snapshot.data.routeBlocks).toBeUndefined();
+    }
+  });
+
+  it('битый ориентир и чужая роль маршрута отклоняются с путём поля (негативный)', () => {
+    const badGuide = { ...itemFixture({ id: 'a', topicId: 't' }), guide: { goal: 'Цель', steps: [{ title: 'Шаг', minutes: -5 }] } };
+    expect(checkSnapshot(JSON.stringify({ app: 'improva', schemaVersion: 2, data: { items: [badGuide] } }))).toEqual({
+      ok: false,
+      reason: 'schema',
+      path: 'items[0].guide',
+    });
+    const badRole = { ...itemFixture({ id: 'a', topicId: 't' }), routeRole: 'teacher' };
+    expect(checkSnapshot(JSON.stringify({ app: 'improva', schemaVersion: 2, data: { items: [badRole] } }))).toMatchObject({ path: 'items[0].routeRole' });
+  });
+
   it('«Объединить» берёт запись с большим updatedAt', async () => {
     const adapter = new MemoryAdapter();
     const old: IItem = { ...itemFixture({ id: 'i1', topicId: 't' }), title: 'старое', updatedAt: '2026-01-01T00:00:00Z' };

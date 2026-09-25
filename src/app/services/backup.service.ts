@@ -49,8 +49,12 @@ export class BackupService {
       data: {
         sections: data.sections.filter((entry) => !entry.archived),
         topics: data.topics.filter((entry) => !entry.archived),
-        items: data.items.filter((entry) => !entry.archived).map((item) => ({ ...item, doneAt: null, weakSpot: false })),
+        // Фото ориентиров — личные ассеты, в шаблон программы не входят
+        items: data.items
+          .filter((entry) => !entry.archived)
+          .map((item) => ({ ...item, doneAt: null, weakSpot: false, guide: item.guide ? { ...item.guide, imageIds: [] } : null })),
         resources: data.resources.filter((entry) => !entry.archived),
+        routeBlocks: data.routeBlocks.filter((entry) => !entry.deletedAt),
       },
     };
     const filename = `improva-program-${this.store.today()}.json`;
@@ -97,8 +101,10 @@ export class BackupService {
             : `Файл не подошёл: ошибка в ${result.path}. Данные в приложении не изменены.`,
       };
     }
-    const snapshot = result.snapshot.kind === 'program' ? withFreshIds(result.snapshot) : result.snapshot;
     const current = this.store.data();
+    const hasRoute = current.routeBlocks.some((block) => !block.deletedAt);
+    // Маршрут из шаблона программы добавляется, только если своего маршрута ещё нет
+    const snapshot = result.snapshot.kind === 'program' ? withFreshIds(result.snapshot, hasRoute) : result.snapshot;
     let added = 0;
     let updated = 0;
     let total = 0;
@@ -136,7 +142,7 @@ export class BackupService {
 }
 
 /** Программа-шаблон получает новые id, чтобы не пересекаться с текущей (ТЗ 8.2). */
-function withFreshIds(snapshot: ISnapshot): ISnapshot {
+function withFreshIds(snapshot: ISnapshot, skipRoute: boolean): ISnapshot {
   const ids = new Map<string, string>();
   const fresh = (id: string): string => {
     const existing = ids.get(id);
@@ -160,6 +166,7 @@ function withFreshIds(snapshot: ISnapshot): ISnapshot {
         topicId: fresh(entry.topicId),
         resourceRefs: entry.resourceRefs.map((ref) => ({ ...ref, resourceId: fresh(ref.resourceId) })),
       })),
+      routeBlocks: skipRoute ? [] : (data.routeBlocks ?? []).map((entry) => ({ ...entry, id: fresh(entry.id) })),
     },
   };
 }

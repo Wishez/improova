@@ -1,6 +1,6 @@
 import { Injectable, computed, inject, signal } from '@angular/core';
 import { buildProgramTree, spentByItem } from '../domain';
-import { SCHEMA_VERSION, STORAGE_ADAPTER, emptyCollections } from '../storage';
+import { SCHEMA_VERSION, STORAGE_ADAPTER, emptyCollections, normalizeCollections } from '../storage';
 import type { IBudget, IChallenge, ICollections, IEntity, IMeta, ISettings, ISnapshot, TCollection } from '../types';
 import { addDays, configureTimeZone, downloadText, toDayKey } from '../utils';
 import { ClockService } from './clock.service';
@@ -69,7 +69,7 @@ export class DataStore {
     try {
       await this.adapter.init();
       const data = await this.adapter.loadAll();
-      this.data.set(data);
+      this.data.set(normalizeCollections(data));
       await this.ensureDefaults();
       this.status.set('ready');
     } catch {
@@ -263,6 +263,7 @@ export function defaultMeta(): IMeta {
     milestonesShown: [],
     lastExportAt: null,
     expanded: [],
+    dayPlans: {},
   };
 }
 
@@ -278,6 +279,7 @@ export function defaultBudget(now: string): IBudget {
     blockMin: 20,
     blockMax: 90,
     reviewIntervals: [3, 10, 30],
+    seasonalWeights: true,
   };
 }
 

@@ -1,6 +1,10 @@
 import type { IEntity } from './entity';
+import type { IGuide } from './guide';
 
 export type TItemKind = 'study' | 'practice';
+
+/** Роль повторяющегося топика в маршруте по мастерам (FR-39). */
+export type TRouteRole = 'study' | 'copy';
 
 export interface IResourceRef {
   readonly resourceId: string;
@@ -23,4 +27,6 @@ export interface IItem extends IEntity {
   readonly order: number;
   readonly doneAt: string | null;
   readonly archived: boolean;
+  readonly guide: IGuide | null;
+  readonly routeRole: TRouteRole | null;
 }

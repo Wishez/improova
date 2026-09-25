@@ -15,12 +15,13 @@ export function budgetFixture(patch: Partial<IBudget> = {}): IBudget {
     blockMin: 20,
     blockMax: 90,
     reviewIntervals: [3, 10, 30],
+    seasonalWeights: false,
     ...patch,
   };
 }
 
 export function sectionFixture(id: string, order: number, weight: 1 | 2 | 3 = 2): ISection {
-  return { id, createdAt: NOW, updatedAt: NOW, title: `Раздел ${id}`, colorToken: 1, order, weight, archived: false };
+  return { id, createdAt: NOW, updatedAt: NOW, title: `Раздел ${id}`, colorToken: 1, order, weight, archived: false, quarterWeights: null };
 }
 
 export function topicFixture(id: string, sectionId: string, order = 0): ITopic {
@@ -52,6 +53,8 @@ export function itemFixture(params: {
     order: params.order ?? 0,
     doneAt: params.doneAt ?? null,
     archived: false,
+    guide: null,
+    routeRole: null,
   };
 }
 

@@ -8,6 +8,8 @@ export interface ITimerState {
   readonly pausedAt: string | null;
   readonly pausedMs: number;
   readonly plannedMin: number;
+  /** Текущее расписание шагов ориентира в минутах после «Следующий шаг» / «+5 мин». */
+  readonly stepMinutes: readonly number[] | null;
 }
 
 export interface ISettings {
@@ -36,5 +38,7 @@ export interface IMeta extends IEntity {
   readonly tips: ITipStats;
   readonly milestonesShown: readonly string[];
   readonly lastExportAt: string | null;
+  /** План дня в минутах, зафиксированный в сам день: календарь не пересчитывает прошлое (FR-36). */
+  readonly dayPlans: Readonly<Record<string, number>>;
   readonly expanded: readonly string[];
 }

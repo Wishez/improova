@@ -6,6 +6,7 @@ import type { IMeta } from './meta';
 import type { INote } from './note';
 import type { IPlanBlock } from './plan-block';
 import type { IResource } from './resource';
+import type { IRouteBlock } from './route-block';
 import type { ISection } from './section';
 import type { ITimeLog } from './time-log';
 import type { ITopic } from './topic';
@@ -22,6 +23,7 @@ export interface ICollections {
   notes: INote[];
   assets: IAsset[];
   meta: IMeta[];
+  routeBlocks: IRouteBlock[];
 }
 
 export type TCollection = keyof ICollections;

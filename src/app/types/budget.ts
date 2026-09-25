@@ -15,4 +15,6 @@ export interface IBudget extends IEntity {
   readonly blockMin: number;
   readonly blockMax: number;
   readonly reviewIntervals: readonly number[];
+  /** Брать веса разделов по кварталам (FR-40). */
+  readonly seasonalWeights: boolean;
 }
