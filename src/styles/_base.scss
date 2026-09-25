@@ -1,0 +1,170 @@
+@reference './tailwind.css';
+
+html,
+body {
+  @apply h-full bg-bg text-text-1 font-sans antialiased;
+}
+
+body {
+  @apply m-0 text-body;
+}
+
+:focus-visible {
+  @apply outline-2 outline-offset-2 outline-accent;
+}
+
+.visuallyHidden {
+  @apply sr-only;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+// Примитивы, общие для всех экранов.
+.card {
+  @apply rounded-card bg-surface-1 p-5;
+}
+
+.card__title {
+  @apply mb-3 text-meta font-semibold tracking-wide text-text-3 uppercase;
+}
+
+.pageTitle {
+  @apply text-headline font-bold text-text-1;
+}
+
+.muted {
+  @apply text-text-3;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+.sectionDot {
+  @apply inline-block h-2.5 w-2.5 shrink-0 rounded-full;
+}
+
+.sectionDot_1 {
+  @apply bg-section-1;
+}
+
+.sectionDot_2 {
+  @apply bg-section-2;
+}
+
+.sectionDot_3 {
+  @apply bg-section-3;
+}
+
+.sectionDot_4 {
+  @apply bg-section-4;
+}
+
+.sectionDot_5 {
+  @apply bg-section-5;
+}
+
+.sectionDot_6 {
+  @apply bg-section-6;
+}
+
+.sectionDot_none {
+  @apply bg-accent;
+}
+
+.skeleton {
+  @apply animate-pulse rounded-control bg-surface-2;
+}
+
+.markdown {
+  @apply text-body text-text-2;
+
+  p,
+  ul,
+  ol {
+    @apply mb-2;
+  }
+
+  ul {
+    @apply list-disc pl-5;
+  }
+
+  ol {
+    @apply list-decimal pl-5;
+  }
+
+  a {
+    @apply text-accent underline;
+  }
+
+  strong {
+    @apply text-text-1;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply mb-2 text-lead font-semibold text-text-1;
+  }
+}
+
+.field {
+  @apply flex flex-col gap-1.5;
+}
+
+.field__label {
+  @apply text-meta text-text-2;
+}
+
+.field__hint {
+  @apply text-meta text-text-3;
+}
+
+.field__error {
+  @apply text-meta text-danger;
+}
+
+.input {
+  @apply w-full rounded-control border border-border-control bg-surface-2 px-3 py-2 text-body text-text-1 transition-colors duration-(--duration-fast);
+
+  &:focus {
+    @apply border-accent outline-none;
+  }
+}
+
+.input_invalid {
+  @apply border-danger;
+}
+
+textarea.input {
+  @apply min-h-24 resize-y;
+}
+
+// Перетаскивание CDK: превью живёт в body, поэтому стили глобальные.
+.cdk-drag-preview {
+  @apply rounded-control bg-surface-3 shadow-2xl ring-1 ring-accent/50;
+}
+
+.cdk-drag-placeholder {
+  @apply opacity-30;
+}
+
+.cdk-drag-animating,
+.cdk-drop-list-dragging .cdk-drag {
+  transition: transform var(--duration-base) var(--ease-standard);
+}
+
+// Подсказки Taiga — нейтральные, без акцентного фона (ТЗ 7.1, п. 3).
+/* Подсказки нейтральные: акцент зарезервирован под главное действие (см. ТЗ 8.1) */
+tui-hint[tuiAppearance] {
+  --tui-background-accent-1: var(--color-surface-3);
+  --tui-text-primary-on-accent-1: var(--color-text-1);
+  @apply border border-border-control text-meta;
+}

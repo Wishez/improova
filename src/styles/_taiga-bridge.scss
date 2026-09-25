@@ -1,0 +1,35 @@
+// Перекрываем тёмную палитру Taiga UI токенами ТЗ 7.3.
+[tuiTheme='dark'],
+tui-root {
+  --tui-background-base: var(--color-bg);
+  --tui-background-base-alt: var(--color-surface-1);
+  --tui-background-elevation-1: var(--color-surface-1);
+  --tui-background-elevation-2: var(--color-surface-2);
+  --tui-background-elevation-3: var(--color-surface-3);
+  --tui-background-accent-1: var(--color-accent);
+  --tui-background-accent-1-hover: #e0fa7e;
+  --tui-background-accent-1-pressed: #b9d94a;
+  --tui-text-primary: var(--color-text-1);
+  --tui-text-secondary: var(--color-text-2);
+  --tui-text-tertiary: var(--color-text-3);
+  --tui-text-primary-on-accent-1: var(--color-on-accent);
+  // Акцент — только у главного действия (ТЗ 7.1, п. 3); вспомогательные действия нейтральные.
+  --tui-text-action: var(--color-text-2);
+  --tui-text-action-hover: var(--color-text-1);
+  --tui-border-normal: var(--color-border);
+  --tui-border-hover: var(--color-border-control);
+  --tui-border-focus: var(--color-accent);
+  --tui-status-positive: var(--color-success);
+  --tui-status-negative: var(--color-danger);
+  --tui-status-warning: var(--color-warning);
+  --tui-text-positive: var(--color-success);
+  --tui-text-negative: var(--color-danger);
+  --tui-font-text: var(--font-sans);
+  --tui-font-heading: var(--font-sans);
+  --tui-chart-categorical-00: var(--color-section-1);
+  --tui-chart-categorical-01: var(--color-section-2);
+  --tui-chart-categorical-02: var(--color-section-3);
+  --tui-chart-categorical-03: var(--color-section-4);
+  --tui-chart-categorical-04: var(--color-section-5);
+  --tui-chart-categorical-05: var(--color-section-6);
+}

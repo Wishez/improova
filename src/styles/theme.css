@@ -1,0 +1,60 @@
+/* Токены темы Импрувы (ТЗ 7.3). Единственный источник цветов, отступов, радиусов и длительностей. */
+@theme static {
+  --color-bg: #0e0f12;
+  --color-surface-1: #16181d;
+  --color-surface-2: #1e2128;
+  --color-surface-3: #262a33;
+  --color-border: #2a2e37;
+  --color-border-control: #666c79;
+  --color-text-1: #ecedef;
+  --color-text-2: #a3a8b3;
+  --color-text-3: #858b97;
+  --color-accent: #d4f55a;
+  --color-accent-dim: #d4f55a1f;
+  --color-on-accent: #0e0f12;
+  --color-success: #5bd68f;
+  --color-warning: #f2b84b;
+  --color-danger: #f07167;
+  --color-section-1: #8fb8ff;
+  --color-section-2: #c9a7ff;
+  --color-section-3: #ffb38a;
+  --color-section-4: #7fd6c2;
+  --color-section-5: #f5a3c7;
+  --color-section-6: #e6d37a;
+
+  --font-sans: 'Manrope', system-ui, sans-serif;
+
+  --text-micro: 0.625rem;
+  --text-micro--line-height: 0.75rem;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.25rem;
+  --text-lead: 1rem;
+  --text-lead--line-height: 1.5rem;
+  --text-title: 1.25rem;
+  --text-title--line-height: 1.75rem;
+  --text-headline: 1.75rem;
+  --text-headline--line-height: 2.25rem;
+  --text-ring: 1.375rem;
+  --text-ring--line-height: 1;
+  --text-hero: 5rem;
+  --text-hero--line-height: 1;
+  --text-display: 2.75rem;
+  --text-display--line-height: 3rem;
+
+  --container-content: 90rem;
+  --container-drawer: 30rem;
+  --spacing-rail: 4.5rem;
+
+  --radius-card: 1rem;
+  --radius-control: 0.75rem;
+
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --duration-fast: 120ms;
+  --duration-base: 200ms;
+  --duration-slow: 320ms;
+
+  --breakpoint-md: 48rem;
+  --breakpoint-xl: 80rem;
+}
