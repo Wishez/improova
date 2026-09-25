@@ -1,0 +1,207 @@
+<header class="head">
+  <h1 class="pageTitle">Программа</h1>
+  <div class="tabs" role="tablist">
+    <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'program'" [attr.aria-selected]="tab() === 'program'" (click)="tab.set('program')">Разделы</button>
+    <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'resources'" [attr.aria-selected]="tab() === 'resources'" (click)="tab.set('resources')">Ресурсы</button>
+  </div>
+</header>
+
+@if (tab() === 'resources') {
+  <app-resources-panel />
+} @else {
+  <div class="toolbar">
+    <tui-segmented size="s" class="toolbar__filter" [activeItemIndex]="filterIndex()" (activeItemIndexChange)="setFilter($event)">
+      @for (entry of filters; track entry.id) {
+        <button type="button">{{ entry.label }}</button>
+      }
+    </tui-segmented>
+    <input class="input toolbar__search" type="search" placeholder="Поиск по названию" aria-label="Поиск по названию" [value]="query()" (input)="query.set(text($event))" />
+    <div class="toolbar__actions">
+      <button tuiButton type="button" size="s" appearance="flat" (click)="expandAll(true)">Развернуть все</button>
+      <button tuiButton type="button" size="s" appearance="flat" (click)="expandAll(false)">Свернуть все</button>
+    </div>
+  </div>
+
+  @if (isEmpty()) {
+    <app-empty-state
+      title="Программа пока пуста"
+      body="Добавь раздел, например «Перспектива». В нём будут темы и топики — планировщик сам разложит их по дням."
+      cta="Добавить раздел"
+      (action)="addingSection.set(true)"
+    />
+  } @else if (view().length === 0) {
+    <app-empty-state
+      [title]="query() ? 'По запросу «' + query() + '» ничего нет' : 'Под фильтр ничего не попало'"
+      [body]="query() ? 'Проверь написание.' : 'Топиков со статусом «' + filters[filterIndex()]?.label + '» нет.'"
+      cta="Сбросить фильтр"
+      (action)="filter.set('all'); query.set('')"
+    />
+  }
+
+  <div class="tree" cdkDropList (cdkDropListDropped)="dropSection($event)" [cdkDropListDisabled]="narrowed()">
+    @for (sectionView of view(); track sectionView.section.id) {
+      @let section = sectionView.section;
+      <section class="section" cdkDrag [cdkDragDisabled]="narrowed()" [id]="'section-' + section.id">
+        <div class="section__head">
+          <button tuiIconButton type="button" size="xs" appearance="flat" cdkDragHandle iconStart="@tui.grip-vertical" class="handle" [disabled]="narrowed()">Перетащить раздел</button>
+          <button type="button" class="chevron" [class.chevron_open]="isOpen(section.id)" [attr.aria-expanded]="isOpen(section.id)" [attr.aria-label]="'Раздел ' + section.title" (click)="toggle(section.id)">
+            <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
+          </button>
+          <span class="sectionDot" [class]="'sectionDot sectionDot_' + section.colorToken"></span>
+          @if (editing()?.id === section.id) {
+            <input class="input section__rename" type="text" aria-label="Название раздела" [value]="section.title" (keydown.enter)="commitRename('section', section.id, $event)" (keydown.escape)="editing.set(null)" (blur)="commitRename('section', section.id, $event)" />
+          } @else {
+            <button type="button" class="section__title" (click)="toggle(section.id)" (dblclick)="editing.set({ kind: 'section', id: section.id })">{{ section.title }}</button>
+          }
+          <div class="progressMini">
+            <span class="progressMini__track"><span class="progressMini__fill" [class]="'progressMini__fill progressMini__fill_' + section.colorToken" [style.transform]="'scaleX(' + sectionView.progress.ratio + ')'"></span></span>
+            <span class="progressMini__count num">{{ sectionView.progress.doneCount }} / {{ sectionView.progress.totalCount }}</span>
+          </div>
+          <label class="section__weight" tuiHint="Вес: как часто планировщик берёт раздел">
+            <span class="visuallyHidden">Вес раздела</span>
+            <select class="input section__weightSelect" (change)="setWeight(section, $event)">
+              @for (weight of weights; track weight) {
+                <option [value]="weight" [selected]="section.weight === weight">вес {{ weight }}</option>
+              }
+            </select>
+          </label>
+          <div class="rowActions">
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.pencil" tuiHint="Переименовать" (click)="editing.set({ kind: 'section', id: section.id })">Переименовать</button>
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.plus" tuiHint="Добавить тему" (click)="addingTopicFor.set(section.id)">Добавить тему</button>
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.trash-2" tuiHint="Удалить раздел" (click)="askDelete('section', section.id, section.title)">Удалить раздел</button>
+          </div>
+        </div>
+
+        @if (isOpen(section.id)) {
+          <div class="section__body">
+            <div class="topics" cdkDropList (cdkDropListDropped)="dropTopic(sectionView, $event)" [cdkDropListDisabled]="narrowed()">
+              @for (topicView of sectionView.topics; track topicView.topic.id) {
+                @let topic = topicView.topic;
+                <div class="topic" cdkDrag [cdkDragDisabled]="narrowed()">
+                  <div class="topic__head">
+                    <button tuiIconButton type="button" size="xs" appearance="flat" cdkDragHandle iconStart="@tui.grip-vertical" class="handle" [disabled]="narrowed()">Перетащить тему</button>
+                    <button type="button" class="chevron" [class.chevron_open]="isOpen(topic.id)" [attr.aria-expanded]="isOpen(topic.id)" [attr.aria-label]="'Тема ' + topic.title" (click)="toggle(topic.id)">
+                      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
+                    </button>
+                    @if (editing()?.id === topic.id) {
+                      <input class="input topic__rename" type="text" aria-label="Название темы" [value]="topic.title" (keydown.enter)="commitRename('topic', topic.id, $event)" (keydown.escape)="editing.set(null)" (blur)="commitRename('topic', topic.id, $event)" />
+                    } @else {
+                      <button type="button" class="topic__title" [class.topic__title_done]="topicView.progress.status === 'done'" (click)="toggle(topic.id)" (dblclick)="editing.set({ kind: 'topic', id: topic.id })">
+                        {{ topic.title }}
+                      </button>
+                    }
+                    @if (topicView.progress.status === 'done') {
+                      <span class="topic__closed">закрыта</span>
+                    }
+                    <div class="progressMini progressMini_topic">
+                      <span class="progressMini__track"><span class="progressMini__fill progressMini__fill_neutral" [style.transform]="'scaleX(' + topicView.progress.ratio + ')'"></span></span>
+                      <span class="progressMini__count num">{{ topicView.progress.doneCount }} / {{ topicView.progress.totalCount }}</span>
+                    </div>
+                    <div class="rowActions">
+                      <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.pencil" tuiHint="Переименовать" (click)="editing.set({ kind: 'topic', id: topic.id })">Переименовать</button>
+                      <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.plus" tuiHint="Добавить топики" (click)="addingItemsFor.set(topic.id)">Добавить топики</button>
+                      <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.trash-2" tuiHint="Удалить тему" (click)="askDelete('topic', topic.id, topic.title)">Удалить тему</button>
+                    </div>
+                  </div>
+
+                  @if (isOpen(topic.id)) {
+                    <div class="topic__body">
+                      @if (editingDescriptionFor() === topic.id) {
+                        <textarea class="input" rows="3" aria-label="Пояснение темы" [value]="topic.description" (change)="setDescription(topic, $event)" (blur)="editingDescriptionFor.set(null)"></textarea>
+                      } @else if (topic.description) {
+                        <button type="button" class="topic__description markdown" (dblclick)="editingDescriptionFor.set(topic.id)" [innerHTML]="topic.description | markdown"></button>
+                      } @else {
+                        <button tuiButton type="button" size="xs" appearance="flat" class="topic__addDescription" (click)="editingDescriptionFor.set(topic.id)">+ Пояснение к теме</button>
+                      }
+                      <ul
+                        class="items"
+                        cdkDropList
+                        [id]="'topic-' + topic.id"
+                        [cdkDropListData]="topicView.items"
+                        [cdkDropListConnectedTo]="allTopicIds()"
+                        [cdkDropListDisabled]="narrowed()"
+                        (cdkDropListDropped)="dropItem(topicView, $event)"
+                      >
+                        @for (item of topicView.items; track item.id; let index = $index) {
+                          <li class="item" [class.item_done]="item.doneAt !== null" cdkDrag [cdkDragData]="item" [cdkDragDisabled]="narrowed()">
+                            <button tuiIconButton type="button" size="xs" appearance="flat" cdkDragHandle iconStart="@tui.grip-vertical" class="handle" [disabled]="narrowed()">Перетащить топик</button>
+                            @if (item.recurrenceWeeks === null) {
+                              <input tuiCheckbox type="checkbox" size="s" [ngModel]="item.doneAt !== null" [attr.aria-label]="'Пройден: ' + item.title" (ngModelChange)="toggleDone(item)" />
+                            } @else {
+                              <span class="item__repeat" tuiHint="Повторяющийся: раз в {{ item.recurrenceWeeks }} нед.">↻</span>
+                            }
+                            @if (editing()?.id === item.id) {
+                              <input class="input item__rename" type="text" aria-label="Название топика" [value]="item.title" (keydown.enter)="commitRename('item', item.id, $event)" (keydown.escape)="editing.set(null)" (blur)="commitRename('item', item.id, $event)" />
+                            } @else {
+                              <button
+                                type="button"
+                                class="item__title"
+                                [id]="'item-' + item.id"
+                                aria-keyshortcuts="Alt+ArrowUp Alt+ArrowDown"
+                                (click)="ui.openItem(item.id)"
+                                (dblclick)="editing.set({ kind: 'item', id: item.id })"
+                                (keydown)="keyMove(topicView, index, $event)"
+                              >
+                                {{ item.title }}
+                              </button>
+                            }
+                            @if (item.weakSpot) {
+                              <span class="chip chip_weak">слабое место</span>
+                            }
+                            <span class="chip">{{ item.kind === 'study' ? 'учёба' : 'практика' }}</span>
+                            <span class="item__time num" [class.item__time_over]="spentOf(item) > item.estimateMin">{{ spentOf(item) | minutes }} / {{ item.estimateMin | minutes }}</span>
+                          </li>
+                        } @empty {
+                          <li class="items__empty">Топик — то, что закрывается галочкой: глава, видео, упражнение. Можно вставить список строками.</li>
+                        }
+                      </ul>
+                      @if (addingItemsFor() === topic.id) {
+                        <div class="bulk">
+                          <textarea #bulk class="input" rows="4" aria-label="Новые топики, по одному в строке" placeholder="Глава 1 · 60&#10;Упражнение с коробками · 45&#10;Видео про свет"></textarea>
+                          <span class="field__hint">Строка — топик. «название · 60» — оценка в минутах, без неё — 60.</span>
+                          <div class="bulk__actions">
+                            <button tuiButton type="button" size="xs" appearance="flat" (click)="addingItemsFor.set(null)">Отмена</button>
+                            <button tuiButton type="button" size="xs" (click)="addItems(topic.id, bulk)">Добавить топики</button>
+                          </div>
+                        </div>
+                      } @else {
+                        <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.plus" class="topic__add" (click)="addingItemsFor.set(topic.id)">Добавить топики</button>
+                      }
+                    </div>
+                  }
+                </div>
+              } @empty {
+                <p class="muted section__empty">В разделе пока нет тем.</p>
+              }
+            </div>
+            @if (addingTopicFor() === section.id) {
+              <input class="input section__newTopic" type="text" placeholder="Название темы, Enter — добавить" aria-label="Название новой темы" (keydown.enter)="addTopic(section.id, $event)" (keydown.escape)="addingTopicFor.set(null)" (blur)="addTopic(section.id, $event)" />
+            } @else {
+              <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.plus" (click)="addingTopicFor.set(section.id)">Добавить тему</button>
+            }
+          </div>
+        }
+      </section>
+    }
+  </div>
+
+  @if (addingSection()) {
+    <input class="input tree__newSection" type="text" placeholder="Название раздела, Enter — добавить" aria-label="Название нового раздела" (keydown.enter)="addSection($event)" (keydown.escape)="addingSection.set(false)" (blur)="addSection($event)" />
+  } @else if (!isEmpty()) {
+    <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.plus" class="tree__add" (click)="addingSection.set(true)">Добавить раздел</button>
+  }
+
+  <ng-template
+    [tuiDialog]="pendingDelete() !== null"
+    [tuiDialogOptions]="{ label: 'У «' + (pendingDelete()?.title ?? '') + '» есть ' + (pendingDelete()?.logs ?? 0) + ' сессий', size: 's' }"
+    (tuiDialogChange)="$event || pendingDelete.set(null)"
+  >
+    <div class="confirm">
+      <p class="confirm__text">В архиве время останется в статистике. Удаление уберёт и сессии, и их часы.</p>
+      <div class="confirm__actions">
+        <button tuiButton type="button" size="m" appearance="flat" (click)="confirmDelete('remove')">Удалить навсегда</button>
+        <button tuiButton type="button" size="m" (click)="confirmDelete('archive')">Перенести в архив</button>
+      </div>
+    </div>
+  </ng-template>
+}

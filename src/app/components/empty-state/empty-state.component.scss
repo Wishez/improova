@@ -1,0 +1,13 @@
+@reference '../../../tailwind.css';
+
+.empty {
+  @apply flex flex-col items-start gap-2 rounded-card border border-dashed border-border px-5 py-6;
+}
+
+.empty__title {
+  @apply text-lead font-semibold text-text-1;
+}
+
+.empty__body {
+  @apply m-0 max-w-prose text-body text-text-2;
+}

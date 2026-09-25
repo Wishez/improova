@@ -1,0 +1,243 @@
+@reference '../../../tailwind.css';
+
+.head {
+  @apply flex flex-wrap items-center justify-between gap-4 pt-2 pb-4;
+}
+
+.tabs {
+  @apply flex gap-1 rounded-control bg-surface-1 p-1;
+}
+
+.tabs__tab {
+  @apply cursor-pointer rounded-control border-0 bg-transparent px-4 py-1.5 text-body text-text-2 transition-colors duration-(--duration-fast) hover:text-text-1;
+}
+
+.tabs__tab_active {
+  @apply bg-surface-3 text-text-1;
+}
+
+.toolbar {
+  @apply mb-4 flex flex-wrap items-center gap-3;
+}
+
+.toolbar__filter {
+  @apply max-w-full overflow-x-auto;
+}
+
+.toolbar__search {
+  @apply w-full md:w-64;
+}
+
+.toolbar__actions {
+  @apply ml-auto flex gap-1;
+}
+
+.tree {
+  @apply flex flex-col gap-3;
+}
+
+.tree__add,
+.tree__newSection {
+  @apply mt-3;
+}
+
+.section {
+  @apply rounded-card bg-surface-1 px-3 py-2;
+}
+
+.section__head,
+.topic__head {
+  @apply flex min-h-11 items-center gap-2;
+}
+
+.section__title,
+.topic__title {
+  @apply min-w-0 flex-1 cursor-pointer truncate border-0 bg-transparent p-0 text-left;
+}
+
+.section__title {
+  @apply text-lead font-semibold text-text-1;
+}
+
+.section__rename,
+.topic__rename,
+.item__rename {
+  @apply min-w-0 flex-1 py-1;
+}
+
+.section__weight {
+  @apply hidden md:block;
+}
+
+.section__weightSelect {
+  @apply w-24 py-1 text-meta;
+}
+
+.section__body {
+  @apply flex flex-col gap-1 pb-2 pl-2 md:pl-8;
+}
+
+.section__empty {
+  @apply m-0 py-2 text-body;
+}
+
+.section__newTopic {
+  @apply mt-1;
+}
+
+.topic {
+  @apply rounded-control px-1;
+}
+
+.topic__title {
+  @apply text-body font-semibold text-text-1;
+}
+
+.topic__title_done {
+  @apply text-text-2;
+}
+
+.topic__closed {
+  @apply shrink-0 rounded-full bg-success/15 px-2 py-0.5 text-meta text-success;
+}
+
+.topic__body {
+  @apply flex flex-col gap-2 pb-3 pl-2 md:pl-8;
+}
+
+.topic__description {
+  @apply cursor-text border-0 bg-transparent p-0 text-left text-meta text-text-3;
+}
+
+.topic__addDescription,
+.topic__add {
+  @apply self-start;
+}
+
+.chevron {
+  @apply flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-text-3 transition-transform duration-(--duration-base) hover:bg-surface-2 hover:text-text-1;
+
+  svg {
+    @apply h-4 w-4 fill-none stroke-current stroke-2;
+  }
+}
+
+.chevron_open {
+  @apply rotate-90;
+}
+
+.handle {
+  @apply hidden cursor-grab text-text-3 md:inline-flex;
+}
+
+.rowActions {
+  @apply flex shrink-0 items-center opacity-60 transition-opacity duration-(--duration-fast) hover:opacity-100;
+}
+
+.progressMini {
+  @apply hidden shrink-0 items-center gap-2 sm:flex;
+}
+
+.progressMini__track {
+  @apply block h-1.5 w-24 overflow-hidden rounded-full bg-surface-3;
+}
+
+.progressMini_topic .progressMini__track {
+  @apply w-16;
+}
+
+.progressMini__fill {
+  @apply block h-full w-full origin-left rounded-full transition-transform duration-(--duration-slow) ease-(--ease-standard);
+}
+
+.progressMini__fill_neutral {
+  @apply bg-text-2;
+}
+
+.progressMini__fill_1 {
+  @apply bg-section-1;
+}
+
+.progressMini__fill_2 {
+  @apply bg-section-2;
+}
+
+.progressMini__fill_3 {
+  @apply bg-section-3;
+}
+
+.progressMini__fill_4 {
+  @apply bg-section-4;
+}
+
+.progressMini__fill_5 {
+  @apply bg-section-5;
+}
+
+.progressMini__fill_6 {
+  @apply bg-section-6;
+}
+
+.progressMini__count {
+  @apply w-14 text-right text-meta text-text-3;
+}
+
+.items {
+  @apply m-0 flex min-h-8 list-none flex-col gap-0.5 p-0;
+}
+
+.items__empty {
+  @apply px-2 py-1 text-meta text-text-3;
+}
+
+.item {
+  @apply flex min-h-10 items-center gap-2 rounded-control bg-surface-1 px-1 transition-colors duration-(--duration-fast) hover:bg-surface-2;
+}
+
+.item_done .item__title {
+  @apply text-text-3 line-through decoration-text-3;
+}
+
+.item__title {
+  @apply min-w-0 flex-1 cursor-pointer truncate border-0 bg-transparent py-2 text-left text-body text-text-1;
+}
+
+.item__repeat {
+  @apply flex h-4 w-4 shrink-0 items-center justify-center text-meta text-accent;
+}
+
+.item__time {
+  @apply hidden w-32 shrink-0 text-right text-meta text-text-3 md:block;
+}
+
+.item__time_over {
+  @apply text-warning;
+}
+
+.chip {
+  @apply hidden shrink-0 rounded-full border border-border px-2 py-0.5 text-micro text-text-3 lg:inline-block;
+}
+
+.chip_weak {
+  @apply inline-block border-warning/40 text-warning;
+}
+
+.bulk {
+  @apply flex flex-col gap-2;
+}
+
+.bulk__actions {
+  @apply flex justify-end gap-2;
+}
+
+.confirm {
+  @apply flex flex-col gap-4;
+}
+
+.confirm__text {
+  @apply m-0 text-body text-text-2;
+}
+
+.confirm__actions {
+  @apply flex flex-wrap justify-end gap-3;
+}
