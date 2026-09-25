@@ -1,0 +1,133 @@
+@reference '../../../tailwind.css';
+
+.head {
+  @apply flex flex-wrap items-center justify-between gap-4 pt-2 pb-4;
+}
+
+.head__sub {
+  @apply m-0 mt-1 text-body;
+}
+
+.notice {
+  @apply mb-3 flex flex-wrap items-center justify-between gap-3 rounded-card border border-warning/40 px-4 py-3 text-body text-text-1;
+}
+
+.notice__actions {
+  @apply flex flex-wrap gap-1;
+}
+
+.review {
+  @apply mb-4 flex flex-col gap-4;
+}
+
+.review__grid {
+  @apply grid gap-6 md:grid-cols-2;
+}
+
+.review__value {
+  @apply mb-2 text-title font-bold text-text-1;
+}
+
+.review__list {
+  @apply m-0 mt-2 flex list-none flex-col gap-1.5 p-0 text-body;
+}
+
+.review__row {
+  @apply flex items-center justify-between gap-3 text-text-2;
+}
+
+.review__weak {
+  @apply flex cursor-pointer items-center gap-2;
+}
+
+.review__actions {
+  @apply flex flex-wrap justify-end gap-2;
+}
+
+.week {
+  @apply grid gap-3 md:grid-cols-4 xl:grid-cols-7;
+}
+
+.day {
+  @apply flex min-w-0 flex-col gap-2 rounded-card bg-surface-1 p-3;
+}
+
+.day_today {
+  @apply ring-1 ring-accent/40;
+}
+
+.day_off {
+  @apply bg-transparent ring-1 ring-border;
+}
+
+.day__head {
+  @apply flex items-baseline justify-between gap-2;
+}
+
+.day__name {
+  @apply text-body font-semibold text-text-1;
+}
+
+.day__load {
+  @apply text-meta text-text-3;
+}
+
+.day_over .day__load {
+  @apply text-warning;
+}
+
+.day__track {
+  @apply block h-1 overflow-hidden rounded-full bg-surface-3;
+}
+
+.day__fill {
+  @apply block h-full w-full origin-left rounded-full bg-text-2 transition-transform duration-(--duration-slow) ease-(--ease-standard);
+}
+
+.day_over .day__fill {
+  @apply bg-warning;
+}
+
+.day__list {
+  @apply flex min-h-12 md:min-h-24 flex-1 flex-col gap-2;
+}
+
+.day__empty {
+  @apply m-0 py-4 text-center text-meta text-text-3;
+}
+
+.pBlock {
+  @apply flex cursor-grab flex-col gap-1.5 rounded-control border border-border bg-surface-2 p-2.5 transition-colors duration-(--duration-fast) hover:border-border-control;
+}
+
+.pBlock__top {
+  @apply flex items-start gap-2;
+}
+
+.pBlock__top .sectionDot {
+  @apply mt-1.5;
+}
+
+.pBlock__title {
+  @apply line-clamp-2 min-w-0 flex-1 cursor-pointer border-0 bg-transparent p-0 text-left text-body text-text-1;
+}
+
+.pBlock__bottom {
+  @apply flex flex-wrap items-center gap-x-2;
+}
+
+.pBlock__meta {
+  @apply min-w-0 flex-1 text-meta text-text-3;
+}
+
+.pBlock__pin {
+  @apply shrink-0 text-micro text-accent;
+}
+
+.pBlock__actions {
+  @apply flex shrink-0 opacity-50 transition-opacity duration-(--duration-fast) hover:opacity-100;
+}
+
+.hint {
+  @apply mt-4 text-meta;
+}

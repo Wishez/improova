@@ -1,0 +1,111 @@
+<header class="head">
+  <div>
+    <h1 class="pageTitle">План</h1>
+    <p class="head__sub muted num">Бюджет {{ wanted() | minutes }} в неделю · свободно {{ planner.plan().capacityPerWeek | minutes }}</p>
+  </div>
+  <button tuiButton type="button" size="s" appearance="flat" iconStart="@tui.settings" (click)="router.navigateByUrl('/settings')">Бюджет и дни</button>
+</header>
+
+@if (noBudget()) {
+  <app-empty-state title="Сколько времени в неделю?" body="Укажи минуты на ресурсы и на практику — план на неделю построится автоматически." cta="Задать бюджет" (action)="router.navigateByUrl('/settings')" />
+} @else if (noDays()) {
+  <app-empty-state title="Нет дней для занятий" body="Во всех днях недели 0 минут. Отметь хотя бы один день для занятий." cta="Выбрать дни" (action)="router.navigateByUrl('/settings')" />
+} @else {
+  @if (overBudget()) {
+    <div class="notice" role="status">
+      <span>Бюджет {{ hours(wanted()) }}, а свободного времени — {{ hours(planner.plan().capacityPerWeek) }}. План уменьшен пропорционально.</span>
+      <button tuiButton type="button" size="xs" appearance="flat" (click)="router.navigateByUrl('/settings')">Изменить дни</button>
+    </div>
+  }
+  @if (unrealistic()) {
+    <div class="notice" role="status">
+      <span class="num">
+        Программе нужно {{ hours(forecast().needPerWeek) }} в неделю, в бюджете — {{ hours(forecast().availablePerWeek) }}.
+        @if (forecast().eta) {
+          В текущем темпе программа закончится {{ forecast().eta ?? '' | dayShort }} {{ (forecast().eta ?? '').slice(0, 4) }}.
+        }
+      </span>
+      <div class="notice__actions">
+        <button tuiButton type="button" size="xs" appearance="flat" (click)="router.navigateByUrl('/settings')">Увеличить бюджет</button>
+        <button tuiButton type="button" size="xs" appearance="flat" (click)="router.navigateByUrl('/program')">Сократить программу</button>
+        <button tuiButton type="button" size="xs" appearance="flat" (click)="router.navigateByUrl('/settings')">Продлить челлендж</button>
+      </div>
+    </div>
+  }
+
+  @if (isReviewDay() && !reviewAccepted()) {
+    <section class="review card" aria-labelledby="review-title">
+      <h2 id="review-title" class="card__title">Обзор недели</h2>
+      <div class="review__grid">
+        <div>
+          <div class="review__value num">{{ weekSummary().fact | minutes }} <span class="muted">/ {{ weekSummary().plan | minutes }}</span></div>
+          <ul class="review__list">
+            @for (entry of weekSummary().sections; track entry.title) {
+              <li class="review__row"><span>{{ entry.title }}</span><span class="muted num">{{ entry.minutes | minutes }}</span></li>
+            } @empty {
+              <li class="muted">На этой неделе сессий не было.</li>
+            }
+          </ul>
+        </div>
+        <div>
+          <span class="field__label">Отметь слабые места — планировщик поставит их раньше</span>
+          <ul class="review__list">
+            @for (item of weekSummary().inProgress; track item.id) {
+              <li class="review__row">
+                <label class="review__weak">
+                  <input tuiSwitch type="checkbox" size="s" [ngModel]="item.weakSpot" (ngModelChange)="toggleWeak(item.id, item.weakSpot)" />
+                  <span>{{ item.title }}</span>
+                </label>
+              </li>
+            } @empty {
+              <li class="muted">Топиков в работе нет.</li>
+            }
+          </ul>
+        </div>
+      </div>
+      <div class="review__actions">
+        <button tuiButton type="button" size="s" appearance="flat" (click)="router.navigateByUrl('/settings')">Поправить ёмкость дней</button>
+        <button tuiButton type="button" size="s" (click)="acceptReview()">Принять план</button>
+      </div>
+    </section>
+  }
+
+  <div class="week" cdkDropListGroup>
+    @for (day of days(); track day.date; let first = $first) {
+      <section class="day" [class.day_today]="first" [class.day_over]="day.planned + day.logged > day.capacity && day.capacity > 0" [class.day_off]="day.capacity === 0 && day.blocks.length === 0">
+        <header class="day__head">
+          <span class="day__name">{{ first ? 'Сегодня' : dayLabel(day) }}</span>
+          <span class="day__load num" [tuiHint]="'Занято ' + (day.planned + day.logged) + ' из ' + day.capacity + ' мин'">{{ day.planned + day.logged }}/{{ day.capacity }}</span>
+        </header>
+        <span class="day__track"><span class="day__fill" [style.transform]="'scaleX(' + (day.capacity > 0 ? ((day.planned + day.logged) / day.capacity > 1 ? 1 : (day.planned + day.logged) / day.capacity) : 0) + ')'"></span></span>
+        <div class="day__list" cdkDropList [id]="'day-' + day.date" [cdkDropListData]="day" [cdkDropListConnectedTo]="dayIds()" (cdkDropListDropped)="drop(day, $event)">
+          @for (block of day.blocks; track block.key) {
+            <article class="pBlock" cdkDrag [cdkDragData]="block">
+              <div class="pBlock__top">
+                <span class="sectionDot" [class]="'sectionDot ' + colorOf(block)"></span>
+                <button type="button" class="pBlock__title" (click)="block.itemId && ui.openItem(block.itemId)">{{ titleOf(block) }}</button>
+              </div>
+              <div class="pBlock__bottom">
+                <span class="pBlock__meta num">{{ typeLabel[block.type] }} · {{ block.plannedMin }} мин</span>
+                @if (block.pinned) {
+                  <span class="pBlock__pin" tuiHint="Закреплён: пересчёт его не двигает">закреплён</span>
+                }
+                <div class="pBlock__actions">
+                  @if (block.pinned) {
+                    <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" tuiHint="Открепить" (click)="planner.unpin(block)">Открепить</button>
+                  } @else {
+                    <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.pin" tuiHint="Закрепить" (click)="planner.pin(block)">Закрепить</button>
+                  }
+                  <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.skip-forward" tuiHint="Пропустить" (click)="planner.skip(block)">Пропустить</button>
+                </div>
+              </div>
+            </article>
+          } @empty {
+            <p class="day__empty">{{ day.capacity === 0 ? 'Выходной' : 'Свободно' }}</p>
+          }
+        </div>
+      </section>
+    }
+  </div>
+  <p class="hint muted">Перетащи блок на другой день — он закрепится. Пропущенный блок не удваивает следующий день: его время возвращается в очередь.</p>
+}
