@@ -1,0 +1,45 @@
+@reference '../../../tailwind.css';
+
+.dlg {
+  @apply flex flex-col gap-4;
+}
+
+.dlg__subtitle {
+  @apply m-0 text-body text-text-2;
+}
+
+.dlg__short {
+  @apply max-w-40;
+}
+
+.dlg__grid {
+  @apply grid gap-4 md:grid-cols-2;
+}
+
+.dlg__check {
+  @apply flex cursor-pointer items-center gap-3 text-body text-text-1;
+}
+
+.dlg__actions {
+  @apply flex flex-wrap justify-end gap-3 pt-2;
+}
+
+.dlg__list {
+  @apply m-0 flex max-h-96 list-none flex-col gap-1 overflow-y-auto p-0;
+}
+
+.dlg__option {
+  @apply flex w-full cursor-pointer items-center gap-3 rounded-control border-0 bg-transparent px-3 py-2 text-left text-body text-text-1 hover:bg-surface-3;
+}
+
+.dlg__option_active {
+  @apply bg-surface-3;
+}
+
+.dlg__optionMeta {
+  @apply ml-auto shrink-0 text-meta text-text-3;
+}
+
+.dlg__group {
+  @apply px-3 pt-3 pb-1 text-meta text-text-3 uppercase;
+}

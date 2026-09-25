@@ -1,0 +1,33 @@
+@if (timer.state(); as state) {
+  <div class="miniTimer" [class.miniTimer_paused]="timer.paused()" aria-live="polite">
+    <span class="miniTimer__pulse" aria-hidden="true"></span>
+    <div class="miniTimer__info">
+      <span class="miniTimer__title">{{ title() }}</span>
+      @if (phase(); as current) {
+        <span class="miniTimer__phase">{{ current.title }}</span>
+      }
+    </div>
+    <span class="miniTimer__clock num">{{ timer.clock() }}</span>
+    <div class="miniTimer__actions">
+      <button
+        tuiIconButton
+        type="button"
+        size="s"
+        appearance="flat"
+        [iconStart]="timer.paused() ? '@tui.play' : '@tui.pause'"
+        [tuiHint]="timer.paused() ? 'Продолжить' : 'Пауза'"
+        (click)="timer.toggle()"
+      >
+        {{ timer.paused() ? 'Продолжить' : 'Пауза' }}
+      </button>
+      <button tuiIconButton type="button" size="s" appearance="flat" iconStart="@tui.maximize-2" tuiHint="Режим фокуса" (click)="ui.focusMode.set(true)">
+        Режим фокуса
+      </button>
+      <button tuiButton type="button" size="s" appearance="primary" iconStart="@tui.square" (click)="timer.stop()">Стоп</button>
+    </div>
+  </div>
+} @else {
+  <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.play" (click)="ui.pickerOpen.set('practice')">
+    Начать сессию
+  </button>
+}

@@ -1,0 +1,45 @@
+@reference '../../../tailwind.css';
+
+:host {
+  @apply flex justify-end;
+}
+
+.miniTimer {
+  @apply flex w-full items-center gap-3 rounded-card border border-accent/40 bg-surface-1 py-1.5 pr-1.5 pl-4 md:w-auto;
+}
+
+.miniTimer_paused {
+  @apply border-border;
+}
+
+.miniTimer__pulse {
+  @apply h-2.5 w-2.5 shrink-0 animate-pulse rounded-full bg-accent;
+}
+
+.miniTimer_paused .miniTimer__pulse {
+  @apply animate-none bg-text-3;
+}
+
+.miniTimer__info {
+  @apply flex min-w-0 flex-1 flex-col md:max-w-64;
+}
+
+.miniTimer__title {
+  @apply truncate text-body font-semibold text-text-1;
+}
+
+.miniTimer__phase {
+  @apply text-meta text-text-3;
+}
+
+.miniTimer__clock {
+  @apply text-lead font-bold text-accent;
+}
+
+.miniTimer_paused .miniTimer__clock {
+  @apply text-text-2;
+}
+
+.miniTimer__actions {
+  @apply flex items-center gap-1;
+}

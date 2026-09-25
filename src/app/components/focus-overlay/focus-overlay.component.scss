@@ -1,0 +1,68 @@
+@reference '../../../tailwind.css';
+
+.focus {
+  @apply fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-bg px-4 py-10;
+  animation: focusIn var(--duration-slow) var(--ease-standard);
+}
+
+.focus__inner {
+  @apply flex w-full max-w-xl flex-col gap-6;
+}
+
+.focus__head {
+  @apply flex items-center justify-between gap-3;
+}
+
+.focus__type {
+  @apply truncate text-lead font-semibold text-text-2;
+}
+
+.focus__clock {
+  @apply text-center text-display font-bold text-accent md:text-hero;
+}
+
+.focus__clock_paused {
+  @apply text-text-3;
+}
+
+.focus__task {
+  @apply flex flex-col gap-1 rounded-card bg-surface-1 p-4 text-body text-text-1;
+}
+
+.focus__label {
+  @apply text-meta text-text-3;
+}
+
+.focus__actions {
+  @apply flex justify-center gap-3;
+}
+
+.phases {
+  @apply m-0 grid list-none grid-cols-2 gap-2 p-0 md:grid-cols-4;
+}
+
+.phases__item {
+  @apply flex flex-col gap-1 rounded-control border border-border p-3 transition-colors duration-(--duration-base);
+}
+
+.phases__item_active {
+  @apply border-accent bg-accent-dim;
+}
+
+.phases__item_done {
+  @apply opacity-50;
+}
+
+.phases__title {
+  @apply text-meta font-semibold text-text-1;
+}
+
+.phases__hint {
+  @apply text-meta text-text-3;
+}
+
+@keyframes focusIn {
+  from {
+    opacity: 0;
+  }
+}

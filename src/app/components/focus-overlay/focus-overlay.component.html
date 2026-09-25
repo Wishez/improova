@@ -1,0 +1,42 @@
+@if (open()) {
+  <section class="focus" role="dialog" aria-modal="true" aria-label="Режим фокуса">
+    <div class="focus__inner">
+      <header class="focus__head">
+        <span class="focus__type">{{ title() }}</span>
+        <button tuiButton type="button" size="s" appearance="flat" iconStart="@tui.minimize-2" (click)="close()">Выйти · Esc</button>
+      </header>
+      <div class="focus__clock num" [class.focus__clock_paused]="timer.paused()">{{ timer.clock() }}</div>
+      @if (timer.phaseIndex() >= 0) {
+        <ol class="phases">
+          @for (phase of timer.phases(); track phase.title; let index = $index) {
+            <li class="phases__item" [class.phases__item_active]="index === timer.phaseIndex()" [class.phases__item_done]="index < timer.phaseIndex()">
+              <span class="phases__title">{{ phase.title }} · {{ phase.minutes }} мин</span>
+              <span class="phases__hint">{{ phase.hint }}</span>
+            </li>
+          }
+        </ol>
+      }
+      @if (timer.previousTask()) {
+        <div class="focus__task">
+          <span class="focus__label">Задача из прошлой сессии</span>
+          <span>{{ timer.previousTask() }}</span>
+        </div>
+      } @else if (isStudy()) {
+        <div class="focus__task">
+          <span class="focus__label">Один навык на сессию</span>
+          <span>Что именно тренируешь?</span>
+        </div>
+      }
+      <label class="field focus__note">
+        <span class="field__label">Конспект — попадёт в карточку итога</span>
+        <textarea class="input" rows="4" [value]="ui.sessionDraft()" (input)="onDraft($event)"></textarea>
+      </label>
+      <div class="focus__actions">
+        <button tuiButton type="button" size="m" appearance="secondary" [iconStart]="timer.paused() ? '@tui.play' : '@tui.pause'" (click)="timer.toggle()">
+          {{ timer.paused() ? 'Продолжить' : 'Пауза' }}
+        </button>
+        <button tuiButton type="button" size="m" iconStart="@tui.square" (click)="timer.stop()">Стоп</button>
+      </div>
+    </div>
+  </section>
+}
