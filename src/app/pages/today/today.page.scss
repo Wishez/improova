@@ -1,0 +1,250 @@
+@reference '../../../tailwind.css';
+
+.today {
+  @apply grid grid-cols-1 gap-6 pt-2 md:grid-cols-2 xl:grid-cols-12;
+}
+
+.today__main {
+  @apply flex flex-col gap-5 md:col-span-2 xl:col-span-5;
+}
+
+.today__center {
+  @apply flex flex-col gap-4 xl:col-span-4;
+}
+
+.today_wide .today__main {
+  @apply xl:col-span-7;
+}
+
+.today_wide .today__center {
+  @apply md:col-span-2 xl:col-span-5;
+}
+
+.today__side {
+  @apply flex flex-col gap-3 xl:col-span-3;
+}
+
+.today__head {
+  @apply flex flex-wrap items-baseline justify-between gap-2;
+}
+
+.today__day {
+  @apply text-body;
+}
+
+.today__h {
+  @apply m-0;
+}
+
+.week {
+  @apply flex flex-col gap-2;
+}
+
+.week__row {
+  @apply flex items-baseline justify-between;
+}
+
+.week__label {
+  @apply text-body text-text-2;
+}
+
+.week__value {
+  @apply text-lead font-semibold text-text-1;
+}
+
+.week__bar {
+  --tui-background-accent-1: var(--color-accent);
+}
+
+.blocks {
+  @apply m-0 flex list-none flex-col gap-2 p-0;
+}
+
+.block {
+  @apply flex flex-wrap items-center gap-3 rounded-card border border-border bg-surface-1 px-4 py-3 transition-colors duration-(--duration-base) md:flex-nowrap;
+}
+
+.block_next {
+  @apply border-accent/40;
+}
+
+.block_done {
+  @apply flex-nowrap border-transparent bg-transparent opacity-70;
+}
+
+.block__check {
+  @apply flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-success/20 text-meta text-success;
+}
+
+.block__dot {
+  @apply hidden shrink-0 md:block;
+}
+
+/* На телефоне название занимает всю строку, действия уходят на вторую */
+.block__main {
+  @apply flex min-w-0 flex-1 basis-full cursor-pointer flex-col gap-0.5 border-0 bg-transparent p-0 text-left md:basis-auto;
+}
+
+.block_done .block__main {
+  @apply basis-auto;
+}
+
+.block__title {
+  @apply line-clamp-2 text-body font-semibold text-text-1 md:truncate;
+}
+
+.block_done .block__title {
+  @apply font-normal text-text-2 line-through decoration-text-3;
+}
+
+.block__meta {
+  @apply truncate text-meta text-text-3;
+}
+
+.block__min {
+  @apply shrink-0 text-body text-text-2;
+}
+
+.block__actions {
+  @apply flex shrink-0 items-center gap-0.5 opacity-70 transition-opacity duration-(--duration-fast) hover:opacity-100;
+}
+
+.block__start {
+  @apply ml-auto shrink-0 md:ml-0;
+}
+
+.overall {
+  @apply flex flex-col items-center;
+}
+
+.overall__ring {
+  @apply relative my-2 flex items-center justify-center;
+}
+
+.overall__circle {
+  @apply text-ring text-accent;
+}
+
+.overall__center {
+  @apply absolute inset-0 flex flex-col items-center justify-center;
+}
+
+.overall__value {
+  @apply text-headline font-bold text-text-1;
+}
+
+.overall__count {
+  @apply text-meta;
+}
+
+.overall__streak {
+  @apply mt-2 flex items-baseline gap-2 text-body;
+}
+
+.overall__streakValue {
+  @apply text-title font-bold text-accent;
+}
+
+.bars {
+  @apply m-0 flex list-none flex-col gap-3 p-0;
+}
+
+.bars__row {
+  @apply flex flex-col gap-1.5 rounded-control p-1 text-inherit no-underline transition-colors duration-(--duration-fast) hover:bg-surface-2;
+}
+
+.bars__head {
+  @apply flex items-center gap-2;
+}
+
+.bars__title {
+  @apply flex-1 truncate text-body text-text-1;
+}
+
+.bars__value {
+  @apply text-meta text-text-2;
+}
+
+.bars__track {
+  @apply block h-1.5 overflow-hidden rounded-full bg-surface-3;
+}
+
+.bars__fill {
+  @apply block h-full w-full origin-left rounded-full transition-transform duration-(--duration-slow) ease-(--ease-standard);
+}
+
+.bars__fill_1 {
+  @apply bg-section-1;
+}
+
+.bars__fill_2 {
+  @apply bg-section-2;
+}
+
+.bars__fill_3 {
+  @apply bg-section-3;
+}
+
+.bars__fill_4 {
+  @apply bg-section-4;
+}
+
+.bars__fill_5 {
+  @apply bg-section-5;
+}
+
+.bars__fill_6 {
+  @apply bg-section-6;
+}
+
+.side {
+  @apply flex flex-col gap-2 rounded-card border border-border px-4 py-3;
+}
+
+.side_warn {
+  @apply border-warning/50;
+}
+
+.side__label {
+  @apply text-meta font-semibold text-text-3 uppercase;
+}
+
+.side__text {
+  @apply m-0 text-meta text-text-3;
+}
+
+.side__list {
+  @apply m-0 flex list-none flex-col gap-1 p-0;
+}
+
+.side__link {
+  @apply flex w-full cursor-pointer items-baseline gap-2 border-0 bg-transparent p-0 text-left text-meta text-text-2 hover:text-text-1;
+}
+
+.side__title {
+  @apply flex-1 truncate;
+}
+
+.side__meta {
+  @apply shrink-0 text-text-3;
+}
+
+.side__meta_due {
+  @apply text-accent;
+}
+
+.side__note {
+  @apply block text-inherit no-underline;
+}
+
+.side__markdown {
+  @apply line-clamp-4 text-meta text-text-3;
+}
+
+.tip__text {
+  @apply m-0 text-body text-text-2;
+}
+
+.tip__actions {
+  @apply flex gap-2;
+}

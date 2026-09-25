@@ -1,0 +1,177 @@
+<div class="today" [class.today_wide]="!hasSide()">
+  <section class="today__main" aria-labelledby="today-title">
+    <header class="today__head">
+      <h1 id="today-title" class="pageTitle">{{ dateLabel() }}</h1>
+      <span class="today__day muted">день {{ insights.dayNumber() }} из {{ totalDays() }}</span>
+    </header>
+
+    <div class="week">
+      <div class="week__row">
+        <span class="week__label">Неделя</span>
+        <span class="week__value num">{{ weekFact() | minutes }} <span class="muted">/ {{ weekPlan() | minutes }}</span></span>
+      </div>
+      <progress tuiProgressBar size="s" class="week__bar" [max]="weekPlan() || 1" [value]="weekFact()"></progress>
+    </div>
+
+    <h2 class="card__title today__h">Сегодня</h2>
+    @if (!hasProgram()) {
+      <app-empty-state
+        title="Начни с программы"
+        body="Возьми готовую программу из 8 разделов или собери свою. План на неделю появится сразу."
+        cta="Выбрать программу"
+        (action)="router.navigateByUrl('/program')"
+      />
+    }
+    <ul class="blocks">
+      @for (log of todayLogs(); track log.id) {
+        <li class="block block_done">
+          <span class="block__check" aria-hidden="true">✓</span>
+          <button type="button" class="block__main" (click)="open(log.itemId)">
+            <span class="block__title">{{ titleOf(log) }}</span>
+            <span class="block__meta">{{ typeLabel[log.type] }} · {{ log.startedAt | clockTime }}</span>
+          </button>
+          <span class="block__min num">{{ log.durationMin | minutes }}</span>
+        </li>
+      }
+      @for (block of blocks(); track block.key; let first = $first) {
+        <li class="block" [class.block_next]="first">
+          <span class="sectionDot block__dot" [class]="'sectionDot block__dot ' + sectionOf(block).color"></span>
+          <button type="button" class="block__main" (click)="open(block.itemId)">
+            <span class="block__title">{{ titleOf(block) }}</span>
+            <span class="block__meta">{{ block.type === 'creative' ? 'Без топика' : sectionOf(block).title }} · {{ typeLabel[block.type] }}{{ block.pinned ? ' · закреплён' : '' }}</span>
+          </button>
+          <span class="block__min num">{{ block.plannedMin }} мин</span>
+          <div class="block__actions">
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.skip-forward" tuiHint="Пропустить" (click)="planner.skip(block)">Пропустить</button>
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.arrow-right" tuiHint="Перенести на завтра" (click)="planner.toTomorrow(block)">Перенести на завтра</button>
+            @if (!block.pinned) {
+              <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.pin" tuiHint="Закрепить" (click)="planner.pin(block)">Закрепить</button>
+            }
+          </div>
+          <button
+            tuiButton
+            type="button"
+            size="s"
+            [appearance]="first ? 'primary' : 'secondary'"
+            iconStart="@tui.play"
+            class="block__start"
+            [disabled]="timer.running()"
+            (click)="start(block)"
+          >
+            Старт
+          </button>
+        </li>
+      }
+    </ul>
+    @if (hasProgram() && blocks().length === 0) {
+      @if (todayLogs().length > 0) {
+        <app-empty-state
+          title="План на сегодня выполнен"
+          [body]="todayMinutes() + ' мин за день.' + (nextDay() ? ' Следующий блок — в ' + nextDay()?.weekday + '.' : '')"
+          cta="Записать итог дня"
+          (action)="newNote()"
+        />
+      } @else {
+        <app-empty-state
+          title="Сегодня день отдыха"
+          [body]="(nextDay() ? 'Следующий блок — в ' + nextDay()?.weekday + ', «' + nextDay()?.title + '». ' : '') + 'Хочешь порисовать сейчас — время тоже засчитается.'"
+          cta="Начать сессию"
+          (action)="ui.pickerOpen.set('practice')"
+        />
+      }
+    }
+  </section>
+
+  <section class="today__center" aria-label="Прогресс челленджа">
+    <div class="card overall">
+      <h2 class="card__title">Прогресс челленджа</h2>
+      <div class="overall__ring">
+        <tui-progress-circle size="xxl" [max]="1" [value]="overall().ratio" class="overall__circle" />
+        <div class="overall__center">
+          <span class="overall__value num">{{ (overall().ratio * 100).toFixed(0) }}&thinsp;%</span>
+          <span class="overall__count muted num">{{ overall().doneCount }} / {{ overall().totalCount }}</span>
+        </div>
+      </div>
+      <div class="overall__streak">
+        <span class="overall__streakValue num">{{ insights.metrics().rhythmStreak }}</span>
+        <span class="muted">{{ insights.metrics().rhythmStreak === 1 ? 'неделя' : 'недель' }} в ритме подряд</span>
+      </div>
+    </div>
+    <div class="card">
+      <h2 class="card__title">Разделы</h2>
+      <ul class="bars">
+        @for (entry of sections(); track entry.section.id) {
+          <li>
+            <a class="bars__row" routerLink="/program" [queryParams]="{ section: entry.section.id }">
+              <span class="bars__head">
+                <span class="sectionDot" [class]="'sectionDot sectionDot_' + entry.section.colorToken"></span>
+                <span class="bars__title">{{ entry.section.title }}</span>
+                <span class="bars__value num">{{ (entry.progress.ratio * 100).toFixed(0) }} %</span>
+              </span>
+              <span class="bars__track">
+                <span class="bars__fill" [class]="'bars__fill bars__fill_' + entry.section.colorToken" [style.transform]="'scaleX(' + entry.progress.ratio + ')'"></span>
+              </span>
+            </a>
+          </li>
+        } @empty {
+          <li class="muted">Разделов пока нет.</li>
+        }
+      </ul>
+    </div>
+  </section>
+
+  @if (hasSide()) {
+  <aside class="today__side" aria-label="Контекст">
+    @if (insights.tip(); as tip) {
+      <div class="side tip">
+        <span class="side__label">Подсказка · {{ tip.method }}</span>
+        <p class="tip__text">{{ tip.text }}</p>
+        <div class="tip__actions">
+          @if (tipAction(tip)) {
+            <button tuiButton type="button" size="xs" appearance="secondary" (click)="runTip(tip)">{{ tipAction(tip) }}</button>
+          }
+          <button tuiButton type="button" size="xs" appearance="flat" (click)="insights.ignoreTip(tip)">Скрыть</button>
+        </div>
+      </div>
+    }
+    @if (reviews().length > 0) {
+      <div class="side">
+        <span class="side__label">Повторения</span>
+        <ul class="side__list">
+          @for (entry of reviews(); track entry.review.itemId) {
+            <li>
+              <button type="button" class="side__link" (click)="ui.openItem(entry.review.itemId)">
+                <span class="side__title">{{ entry.title }}</span>
+                <span class="side__meta num" [class.side__meta_due]="entry.review.dueDate <= store.today()">{{ entry.review.dueDate | dayShort }}</span>
+              </button>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+    @if (lastNote(); as note) {
+      <div class="side">
+        <span class="side__label">Последняя заметка</span>
+        <a class="side__note" routerLink="/notes" [queryParams]="{ open: note.id }">
+          <div class="markdown side__markdown" [innerHTML]="(note.body || note.worked || note.next) | markdown"></div>
+        </a>
+      </div>
+    }
+    @if (backupDays(); as days) {
+      <div class="side">
+        <span class="side__label">Копия данных</span>
+        <p class="side__text">Последняя копия — {{ days }} дн. назад. Данные живут только в этом браузере.</p>
+        <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.download" (click)="backup.exportFull()">Скачать копию</button>
+      </div>
+    }
+    @if (backup.usage(); as usage) {
+      @if (usage.ratio >= 0.8) {
+        <div class="side side_warn" role="alert">
+          <p class="side__text">Хранилище заполнено на {{ (usage.ratio * 100).toFixed(0) }} %. Скачай копию и удали старые фото, чтобы новые записи сохранялись.</p>
+          <button tuiButton type="button" size="xs" appearance="flat" (click)="backup.exportFull()">Скачать копию</button>
+        </div>
+      }
+    }
+  </aside>
+  }
+</div>
