@@ -96,13 +96,15 @@
               </div>
               <div class="pBlock__bottom">
                 <span class="pBlock__meta num">{{ typeLabel[block.type] }} · {{ block.plannedMin }} мин</span>
-                @if (block.pinned) {
+                @if (block.pinned && block.storedId === null) {
+                  <span class="pBlock__pin" tuiHint="Контрольная работа: ставится сама в день с ёмкостью от 2 ч">контрольная</span>
+                } @else if (block.pinned) {
                   <span class="pBlock__pin" tuiHint="Закреплён: пересчёт его не двигает">закреплён</span>
                 }
                 <div class="pBlock__actions">
-                  @if (block.pinned) {
+                  @if (block.pinned && block.storedId !== null) {
                     <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" tuiHint="Открепить" (click)="planner.unpin(block)">Открепить</button>
-                  } @else {
+                  } @else if (!block.pinned) {
                     <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.pin" tuiHint="Закрепить" (click)="planner.pin(block)">Закрепить</button>
                   }
                   <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.skip-forward" tuiHint="Пропустить" (click)="planner.skip(block)">Пропустить</button>

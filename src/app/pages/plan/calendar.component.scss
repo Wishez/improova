@@ -156,6 +156,10 @@
   @apply bg-warning;
 }
 
+.calMarker[data-kind='checkpoint'] {
+  @apply rounded-none bg-text-1;
+}
+
 .calMarker[data-kind='eta'] {
   @apply bg-success;
 }

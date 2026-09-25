@@ -16,7 +16,15 @@ interface IGalleryEntry {
   readonly last: { readonly asset: IAsset; readonly day: string } | null;
 }
 
-/** Лента заметок, поиск, фильтр по разделу и галерея «Было / стало» (FR-16, FR-17). */
+/** Фото контрольной работы в ленте роста (FR-41). */
+interface ICheckpointPhoto {
+  readonly id: string;
+  readonly asset: IAsset;
+  readonly day: string;
+  readonly title: string;
+}
+
+/** Лента заметок, поиск, фильтр по разделу, галерея «Было / стало» и лента контрольных (FR-16, FR-17, FR-41). */
 @Component({
   selector: 'app-notes-page',
   imports: [TuiButton, EmptyStateComponent, NoteEditorComponent, DayShortPipe, MarkdownPipe],
@@ -83,6 +91,27 @@ export class NotesPage {
         ? [{ topicId, title: tree.topicById.get(topicId)?.title ?? '', first, last: last && last.day !== first.day ? last : null }]
         : [];
     }).flat();
+  });
+
+  /** Фото из заметок к контрольным работам — от ранних к поздним. */
+  protected readonly checkpoints = computed<ICheckpointPhoto[]>(() => {
+    const tree = this.store.tree();
+    const assets = this.store.assetsById();
+    const boundary = this.store.settings().dayBoundaryHour;
+    const photos: ICheckpointPhoto[] = [];
+    for (const note of this.store.data().notes) {
+      const item = note.itemId ? tree.itemById.get(note.itemId) : undefined;
+      if (!item || item.checkpointDay === null) {
+        continue;
+      }
+      for (const id of note.imageIds) {
+        const asset = assets.get(id);
+        if (asset) {
+          photos.push({ id, asset, day: toDayKey(new Date(note.createdAt), boundary), title: item.title });
+        }
+      }
+    }
+    return photos.sort((a, b) => a.day.localeCompare(b.day) || a.id.localeCompare(b.id));
   });
 
   constructor() {

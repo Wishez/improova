@@ -9,6 +9,8 @@ const BREAK_MIN = 10;
 const MAX_REVIEWS_PER_DAY = 2;
 const MAX_ITEM_BLOCKS_PER_DAY = 2;
 const HISTORY_DAYS = 28;
+/** Контрольная ставится в день, где свободно не меньше двух часов (FR-41). */
+export const CHECKPOINT_CAPACITY_MIN = 120;
 
 export interface IPlannedBlock {
   /** Стабильный ключ блока в рамках расчёта. */
@@ -53,6 +55,8 @@ export interface IPlannerInput {
   readonly boundaryHour: number;
   /** Веса разделов этой недели (FR-40); по умолчанию — вес раздела. */
   readonly sectionWeights?: ReadonlyMap<string, number>;
+  /** Дата старта челленджа: от неё считаются дни контрольных работ (FR-41). */
+  readonly challengeStart?: string;
 }
 
 interface IWeekCounters {
@@ -185,6 +189,46 @@ export function planWeek(input: IPlannerInput): IPlanResult {
     }
   }
 
+  // Контрольные работы (FR-41): закреплённый блок в первый день не раньше срока, где свободно ≥ 2 ч
+  if (input.challengeStart) {
+    const start = input.challengeStart;
+    const loggedOn = (day: string): number =>
+      day === today ? logs.filter((log) => dayOfLog(log) === day).reduce((sum, log) => sum + log.durationMin, 0) : 0;
+    const freeOn = (day: string): number =>
+      (budget.dayCapacity[weekdayIndex(day)] ?? 0) - loggedOn(day) - (pinnedByDay.get(day) ?? []).reduce((sum, block) => sum + block.plannedMin, 0);
+    const checkpoints = allItems
+      .filter((item) => item.checkpointDay !== null && isPlannable(item) && !pinned.some((block) => block.itemId === item.id))
+      .sort((a, b) => (a.checkpointDay ?? 0) - (b.checkpointDay ?? 0));
+    for (const item of checkpoints) {
+      const due = addDays(start, (item.checkpointDay ?? 1) - 1);
+      const from = due > today ? due : today;
+      const days = horizon.filter((day) => day >= from && !skipped.has(`${day}|${item.id}`));
+      if (days.length === 0) {
+        continue;
+      }
+      const fitting = days.find((day) => freeOn(day) >= CHECKPOINT_CAPACITY_MIN);
+      const roomiest = [...days].sort((a, b) => freeOn(b) - freeOn(a) || a.localeCompare(b))[0];
+      const day = fitting ?? roomiest;
+      if (!day || freeOn(day) <= 0) {
+        continue;
+      }
+      const block: IPlannedBlock = {
+        key: `checkpoint:${item.id}`,
+        date: day,
+        itemId: item.id,
+        sectionId: sectionIdOfItem(tree, item.id),
+        type: item.kind,
+        plannedMin: item.estimateMin,
+        pinned: true,
+        storedId: null,
+        reviewIndex: null,
+      };
+      pinnedByDay.set(day, [...(pinnedByDay.get(day) ?? []), block]);
+      spend(weekOf(day), block.type, block.plannedMin);
+      remaining.delete(item.id);
+    }
+  }
+
   // История по разделам за 28 дней для дефицитного выбора (ТЗ 5.4).
   const historyFrom = addDays(today, -HISTORY_DAYS);
   const allocated = { study: new Map<string, number>(), practice: new Map<string, number>() };
@@ -207,7 +251,7 @@ export function planWeek(input: IPlannerInput): IPlanResult {
       for (const topic of tree.topicsBySection.get(section.id) ?? []) {
         for (const item of tree.itemsByTopic.get(topic.id) ?? []) {
           rank += 1;
-          if (item.kind === kind && remaining.has(item.id)) {
+          if (item.kind === kind && remaining.has(item.id) && item.checkpointDay === null) {
             list.push({ item, sectionId: section.id, rank });
           }
         }
@@ -220,6 +264,10 @@ export function planWeek(input: IPlannerInput): IPlanResult {
   // Повторения (ТЗ 5.6) и повторяющиеся топики (M9).
   const pendingReviews: IReviewDue[] = [];
   for (const item of allItems) {
+    // Контрольная — срез уровня, повторять её не нужно (FR-41)
+    if (item.checkpointDay !== null) {
+      continue;
+    }
     const state = reviewState({ item, logs, intervals: budget.reviewIntervals, boundaryHour });
     if (state.pending && state.pending.dueDate <= lastDay) {
       pendingReviews.push(state.pending);

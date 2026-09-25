@@ -26,6 +26,7 @@ export class PlanService {
       blocks: this.store.data().planBlocks,
       boundaryHour: this.store.settings().dayBoundaryHour,
       sectionWeights: this.course.sectionWeights(),
+      challengeStart: this.store.challenge().startDate,
     }),
   );
 
@@ -61,6 +62,9 @@ export class PlanService {
       remainingBySection,
       weightsForQuarter: (quarter) => sectionWeightsFor({ sections, quarter, seasonal }),
       routeBlocks: this.course.routeBlocks(),
+      checkpoints: [...tree.itemById.values()]
+        .filter((item) => item.checkpointDay !== null)
+        .map((item) => ({ day: item.checkpointDay ?? 0, label: item.title, done: item.doneAt !== null })),
     });
   });
 

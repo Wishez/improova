@@ -71,6 +71,19 @@
     }
   </ul>
 } @else {
+  @if (checkpoints().length > 0) {
+    <section class="card growth" aria-labelledby="growth-title">
+      <h2 id="growth-title" class="growth__title">Контрольные работы</h2>
+      <ol class="growth__strip">
+        @for (photo of checkpoints(); track photo.id) {
+          <li class="growth__item">
+            <img class="growth__img" [src]="photo.asset.dataUrl" [alt]="photo.title" loading="lazy" />
+            <span class="growth__caption">{{ photo.title }} · {{ photo.day | dayShort }}</span>
+          </li>
+        }
+      </ol>
+    </section>
+  }
   <div class="gallery">
     @for (entry of gallery(); track entry.topicId) {
       <article class="card compareCard">

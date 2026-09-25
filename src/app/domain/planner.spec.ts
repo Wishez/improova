@@ -182,3 +182,50 @@ describe('planWeek (ТЗ 5)', () => {
     expect(performance.now() - started).toBeLessThan(1500);
   });
 });
+
+describe('контрольные работы в плане (FR-41, US-16)', () => {
+  // Пн 0, Вт 90, Ср 60, Чт 150, Пт 0, Сб 180, Вс 0
+  const budget = budgetFixture({ dayCapacity: [0, 90, 60, 150, 0, 180, 0] });
+  const withCheckpoint = (patch: { readonly doneAt?: string | null } = {}): IPlannerInput => {
+    const program = programFixture();
+    const checkpoint = itemFixture({ id: 'cp', topicId: 'a0', estimateMin: 120, checkpointDay: 3, order: 99, doneAt: patch.doneAt ?? null });
+    return input({ budget, tree: buildProgramTree({ ...program, items: [...program.items, checkpoint] }), challengeStart: MONDAY });
+  };
+  const checkpointDays = (plan: ReturnType<typeof planWeek>): string[] =>
+    plan.days.filter((day) => day.blocks.some((block) => block.itemId === 'cp')).map((day) => day.date);
+
+  it('ставится закреплённым блоком в первый день не раньше срока, где свободно ≥ 2 ч', () => {
+    const plan = planWeek(withCheckpoint());
+    // Срок — среда (день 3), в среде 60 мин, поэтому четверг
+    expect(checkpointDays(plan)).toEqual([addDays(MONDAY, 3)]);
+    const block = plan.days.flatMap((day) => day.blocks).find((entry) => entry.itemId === 'cp');
+    expect(block).toMatchObject({ pinned: true, plannedMin: 120 });
+  });
+
+  it('до срока не попадает в обычный план', () => {
+    const plan = planWeek(withCheckpoint());
+    const before = plan.days.filter((day) => day.date < addDays(MONDAY, 2));
+    expect(before.some((day) => day.blocks.some((block) => block.itemId === 'cp'))).toBe(false);
+  });
+
+  it('пропуск переносит контрольную на следующий подходящий день', () => {
+    const skipped: IPlanBlock = {
+      id: 's1',
+      createdAt: MONDAY,
+      updatedAt: MONDAY,
+      date: addDays(MONDAY, 3),
+      itemId: 'cp',
+      type: 'practice',
+      plannedMin: 120,
+      pinned: false,
+      status: 'skipped',
+    };
+    expect(checkpointDays(planWeek({ ...withCheckpoint(), blocks: [skipped] }))).toEqual([addDays(MONDAY, 5)]);
+  });
+
+  it('просроченная и не пройденная ставится от сегодня; пройденная — не ставится', () => {
+    const late = { ...withCheckpoint(), today: addDays(MONDAY, 7), horizonDays: 7 };
+    expect(checkpointDays(planWeek(late))).toEqual([addDays(MONDAY, 10)]);
+    expect(checkpointDays(planWeek(withCheckpoint({ doneAt: '2026-01-06T10:00:00.000Z' })))).toEqual([]);
+  });
+});

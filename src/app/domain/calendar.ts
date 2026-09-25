@@ -9,7 +9,14 @@ export const MILESTONE_DAY = 66;
 
 export type TCalendarState = 'done' | 'partial' | 'missed' | 'off' | 'today' | 'planned' | 'projected';
 
-export type TCalendarMarkerKind = 'quarter' | 'route' | 'milestone' | 'eta' | 'end';
+export type TCalendarMarkerKind = 'quarter' | 'route' | 'milestone' | 'checkpoint' | 'eta' | 'end';
+
+/** Контрольная работа на календаре (FR-41): день челленджа с 1. */
+export interface ICalendarCheckpoint {
+  readonly day: number;
+  readonly label: string;
+  readonly done: boolean;
+}
 
 export interface ICalendarMarker {
   readonly kind: TCalendarMarkerKind;
@@ -46,6 +53,8 @@ export interface ICalendarInput {
   readonly remainingBySection: ReadonlyMap<string, number>;
   readonly weightsForQuarter: (quarter: number) => ReadonlyMap<string, number>;
   readonly routeBlocks: readonly IRouteBlock[];
+  /** Контрольные работы; нет — без отметок. */
+  readonly checkpoints?: readonly ICalendarCheckpoint[];
 }
 
 function pastState(planMin: number, factMin: number): TCalendarState {
@@ -91,6 +100,11 @@ export function buildCalendar(input: ICalendarInput): ICalendarDay[] {
     }
     if (index === MILESTONE_DAY - 1) {
       markers.push({ kind: 'milestone', label: `День ${MILESTONE_DAY}` });
+    }
+    for (const checkpoint of input.checkpoints ?? []) {
+      if (checkpoint.day - 1 === index) {
+        markers.push({ kind: 'checkpoint', label: `${checkpoint.label}${checkpoint.done ? ' — пройдена' : ''}` });
+      }
     }
     if (index === total) {
       markers.push({ kind: 'end', label: 'Финал челленджа' });
