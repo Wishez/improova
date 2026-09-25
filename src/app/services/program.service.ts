@@ -1,8 +1,8 @@
 import { Injectable, inject } from '@angular/core';
-import { estimateFromResource } from '../domain';
+import { GUIDE_LIMITS, estimateFromResource } from '../domain';
 import { buildSeed } from '../seed';
-import type { IItem, IResource, ISection, ITopic, TItemKind, TSectionWeight } from '../types';
-import { createId } from '../utils';
+import type { IAsset, IGuide, IItem, IResource, ISection, ITopic, TItemKind, TSectionWeight } from '../types';
+import { compressImage, createId } from '../utils';
 import { DataStore } from './data.store';
 import { ToastService } from './toast.service';
 
@@ -45,6 +45,7 @@ export class ProgramService {
     this.store.upsertMany('sections', seed.sections);
     this.store.upsertMany('topics', seed.topics);
     this.store.upsertMany('items', seed.items);
+    this.store.upsertMany('routeBlocks', seed.routeBlocks);
   }
 
   addSection(title: string): ISection {
@@ -58,6 +59,7 @@ export class ProgramService {
       colorToken: (sections.length % 6) + 1,
       order: nextOrder(sections),
       weight: 2,
+      quarterWeights: null,
       archived: false,
     };
     this.store.upsert('sections', section);
@@ -100,6 +102,8 @@ export class ProgramService {
       order: order++,
       doneAt: null,
       archived: false,
+      guide: null,
+      routeRole: null,
     }));
     this.store.upsertMany('items', items);
     return items;
@@ -300,10 +304,56 @@ export class ProgramService {
         order: order++,
         doneAt: null,
         archived: false,
+        guide: null,
+        routeRole: null,
       };
     });
     this.store.upsertMany('items', items);
     return items.length;
+  }
+
+  // ——— Ориентир топика (FR-37) ———
+
+  setGuide(itemId: string, guide: IGuide | null): void {
+    this.updateItem(itemId, { guide });
+  }
+
+  /** Фото-референсы ориентира: сжатие до 1600 px WebP, до 4 штук (как у заметок, FR-17). */
+  async addGuidePhotos(itemId: string, files: readonly File[]): Promise<void> {
+    const item = this.store.data().items.find((entry) => entry.id === itemId);
+    if (!item?.guide) {
+      return;
+    }
+    const free = GUIDE_LIMITS.photos - item.guide.imageIds.length;
+    if (free <= 0) {
+      this.toasts.show({ text: `К ориентиру можно прикрепить до ${GUIDE_LIMITS.photos} фото.` });
+      return;
+    }
+    try {
+      const assets: IAsset[] = [];
+      for (const file of files.slice(0, free)) {
+        if (!file.type.startsWith('image/')) {
+          continue;
+        }
+        const image = await compressImage(file);
+        const now = this.now();
+        assets.push({ id: createId(), createdAt: now, updatedAt: now, ...image });
+      }
+      this.store.upsertMany('assets', assets);
+      const fresh = this.store.data().items.find((entry) => entry.id === itemId)?.guide ?? item.guide;
+      this.setGuide(itemId, { ...fresh, imageIds: [...fresh.imageIds, ...assets.map((asset) => asset.id)] });
+    } catch {
+      this.toasts.show({ text: 'Не удалось обработать фото. Попробуй JPEG или PNG.', kind: 'error' });
+    }
+  }
+
+  removeGuidePhoto(itemId: string, assetId: string): void {
+    const item = this.store.data().items.find((entry) => entry.id === itemId);
+    if (!item?.guide) {
+      return;
+    }
+    this.setGuide(itemId, { ...item.guide, imageIds: item.guide.imageIds.filter((id) => id !== assetId) });
+    this.store.remove('assets', [assetId]);
   }
 }
 

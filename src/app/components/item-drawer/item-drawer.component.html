@@ -30,6 +30,8 @@
         }
       </div>
 
+      <app-guide-card [item]="current" />
+
       <section class="drawer__block">
         <div class="drawer__spent">
           <span class="drawer__spentValue num">{{ spent() | minutes }}</span>

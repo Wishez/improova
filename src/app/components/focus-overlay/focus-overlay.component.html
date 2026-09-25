@@ -6,15 +6,55 @@
         <button tuiButton type="button" size="s" appearance="flat" iconStart="@tui.minimize-2" (click)="close()">Выйти · Esc</button>
       </header>
       <div class="focus__clock num" [class.focus__clock_paused]="timer.paused()">{{ timer.clock() }}</div>
+      @if (task()) {
+        <div class="focus__task">
+          <span class="focus__label">Задание</span>
+          <span>{{ task() }}</span>
+        </div>
+      }
       @if (timer.phaseIndex() >= 0) {
         <ol class="phases">
           @for (phase of timer.phases(); track phase.title; let index = $index) {
             <li class="phases__item" [class.phases__item_active]="index === timer.phaseIndex()" [class.phases__item_done]="index < timer.phaseIndex()">
-              <span class="phases__title">{{ phase.title }} · {{ phase.minutes }} мин</span>
+              <span class="phases__title">{{ phase.title }} · {{ round(phase.minutes) }} мин</span>
               <span class="phases__hint">{{ phase.hint }}</span>
             </li>
           }
         </ol>
+        @if (step(); as current) {
+          <div class="stepBar">
+            <span class="stepBar__text num">
+              Осталось {{ current.remaining }} мин
+              @if (current.next) {
+                · дальше: {{ current.next }}
+              }
+            </span>
+            <div class="stepBar__actions">
+              <button tuiButton type="button" size="xs" appearance="secondary" (click)="timer.extendStep()">+5 мин</button>
+              @if (current.next) {
+                <button tuiButton type="button" size="xs" appearance="secondary" iconEnd="@tui.skip-forward" (click)="timer.nextStep()">Следующий шаг</button>
+              }
+            </div>
+          </div>
+        }
+      }
+      @if (guide(); as current) {
+        @if (current.stopCriterion || mainRef()) {
+          <div class="focus__task">
+            @if (current.stopCriterion) {
+              <span class="focus__label">Стоп-критерий</span>
+              <span>{{ current.stopCriterion }}</span>
+            }
+            @if (mainRef(); as reference) {
+              <span class="focus__label">Референс</span>
+              @if (reference.url) {
+                <a class="focus__link" [href]="reference.url" target="_blank" rel="noopener noreferrer">{{ reference.title }}{{ reference.locator ? ' · ' + reference.locator : '' }}</a>
+              } @else {
+                <span>{{ reference.title }}</span>
+              }
+            }
+          </div>
+        }
       }
       @if (timer.previousTask()) {
         <div class="focus__task">

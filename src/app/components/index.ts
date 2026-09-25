@@ -6,6 +6,7 @@ export * from './dialogs/session-summary.component';
 export * from './dialogs/switch-confirm.component';
 export * from './empty-state/empty-state.component';
 export * from './focus-overlay/focus-overlay.component';
+export * from './guide-card/guide-card.component';
 export * from './heatmap/heatmap.component';
 export * from './item-drawer/item-drawer.component';
 export * from './log-list/log-list.component';

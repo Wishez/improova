@@ -1,5 +1,6 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import type { ITimerState, TSessionType } from '../types';
+import { scaleSteps } from '../domain';
+import type { IGuideStep, ITimerState, TSessionType } from '../types';
 import { formatClock } from '../utils';
 import { DataStore } from './data.store';
 import { LogsService } from './logs.service';
@@ -11,6 +12,22 @@ export interface IPhase {
   readonly title: string;
   readonly hint: string;
   readonly minutes: number;
+}
+
+export const STEP_EXTEND_MIN = 5;
+
+/** Шаги ориентира вместо шаблона фаз (FR-38): расписание из таймера или масштаб под длину блока. */
+export function buildGuidePhases(params: {
+  readonly steps: readonly IGuideStep[];
+  readonly plannedMin: number;
+  readonly stepMinutes: readonly number[] | null;
+}): IPhase[] {
+  const { steps, plannedMin, stepMinutes } = params;
+  const minutes =
+    stepMinutes && stepMinutes.length === steps.length
+      ? stepMinutes
+      : scaleSteps(steps, plannedMin > 0 ? plannedMin : steps.reduce((sum, entry) => sum + entry.minutes, 0));
+  return steps.map((entry, index) => ({ title: entry.title, hint: '', minutes: minutes[index] ?? entry.minutes }));
 }
 
 /** Шаблон 90-минутной сессии (ТЗ M3): масштабируется под длину блока. */
@@ -65,9 +82,20 @@ export class TimerService {
     const id = this.state()?.itemId;
     return id ? (this.store.data().items.find((item) => item.id === id) ?? null) : null;
   });
-  readonly phases = computed(() => buildPhases(this.state()?.plannedMin ?? 0));
+  /** Шаги ориентира топика, если они есть (FR-38). */
+  readonly guideSteps = computed(() => {
+    const steps = this.item()?.guide?.steps ?? [];
+    return steps.length > 0 ? steps : null;
+  });
+  readonly phases = computed(() => {
+    const timer = this.state();
+    const steps = this.guideSteps();
+    return steps
+      ? buildGuidePhases({ steps, plannedMin: timer?.plannedMin ?? 0, stepMinutes: timer?.stepMinutes ?? null })
+      : buildPhases(timer?.plannedMin ?? 0);
+  });
   readonly phaseIndex = computed(() => {
-    if (!this.store.settings().phases) {
+    if (!this.guideSteps() && !this.store.settings().phases) {
       return -1;
     }
     let passed = 0;
@@ -115,7 +143,7 @@ export class TimerService {
       if (this.lastPhaseIndex !== -1 && index !== this.lastPhaseIndex && index >= 0) {
         const phase = this.phases()[index];
         this.sound.chime();
-        this.sound.notify(`Фаза: ${phase?.title ?? ''}`);
+        this.sound.notify(`${this.guideSteps() ? 'Шаг' : 'Фаза'}: ${phase?.title ?? ''}`);
       }
       this.lastPhaseIndex = index;
     });
@@ -153,6 +181,7 @@ export class TimerService {
         pausedAt: null,
         pausedMs: 0,
         plannedMin: params.plannedMin,
+        stepMinutes: null,
       },
     });
     this.tick.set(Date.now());
@@ -181,6 +210,36 @@ export class TimerService {
     } else {
       this.pause();
     }
+  }
+
+  /** «Следующий шаг»: остаток текущего шага уходит в последний, длина блока не меняется (US-10). */
+  nextStep(): void {
+    const timer = this.state();
+    const index = this.phaseIndex();
+    const minutes = this.phases().map((phase) => phase.minutes);
+    const last = minutes.length - 1;
+    if (!timer || !this.guideSteps() || index < 0 || index >= last) {
+      return;
+    }
+    const start = minutes.slice(0, index).reduce((sum, value) => sum + value, 0);
+    const spent = Math.max(0, this.elapsed() / 60_000 - start);
+    const current = minutes[index] ?? 0;
+    const moved = Math.max(0, current - spent);
+    minutes[index] = current - moved;
+    minutes[last] = (minutes[last] ?? 0) + moved;
+    this.store.updateMeta({ timer: { ...timer, stepMinutes: minutes } });
+  }
+
+  /** «+5 мин» к текущему шагу: блок удлиняется. */
+  extendStep(): void {
+    const timer = this.state();
+    const index = this.phaseIndex();
+    if (!timer || !this.guideSteps() || index < 0) {
+      return;
+    }
+    const minutes = this.phases().map((phase) => phase.minutes);
+    minutes[index] = (minutes[index] ?? 0) + STEP_EXTEND_MIN;
+    this.store.updateMeta({ timer: { ...timer, stepMinutes: minutes, plannedMin: timer.plannedMin + STEP_EXTEND_MIN } });
   }
 
   /** Стоп: лог сохраняется сразу, карточка итога — необязательна (FR-13). */

@@ -7,13 +7,14 @@ import { DayShortPipe, MarkdownPipe, MinutesPipe } from '../../pipes';
 import { DataStore, NotesService, PlanService, ProgramService, TimerService, UiStateService } from '../../services';
 import type { IResourceRef, TItemKind } from '../../types';
 import { RESOURCE_TYPE_LABEL, toDayKey } from '../../utils';
+import { GuideCardComponent } from '../guide-card/guide-card.component';
 import { LogListComponent } from '../log-list/log-list.component';
 import { NoteEditorComponent } from '../note-editor/note-editor.component';
 
-/** Карточка топика: пояснение, ресурсы, время, логи, заметки, старт и галочка (FR-08). */
+/** Карточка топика: ориентир, пояснение, ресурсы, время, логи, заметки, старт и галочка (FR-08, FR-37). */
 @Component({
   selector: 'app-item-drawer',
-  imports: [FormsModule, TuiButton, TuiCheckbox, TuiSwitch, TuiDialog, MinutesPipe, DayShortPipe, MarkdownPipe, LogListComponent, NoteEditorComponent],
+  imports: [FormsModule, TuiButton, TuiCheckbox, TuiSwitch, TuiDialog, MinutesPipe, DayShortPipe, MarkdownPipe, LogListComponent, NoteEditorComponent, GuideCardComponent],
   templateUrl: './item-drawer.component.html',
   styleUrl: './item-drawer.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

@@ -36,6 +36,9 @@
         <input tuiCheckbox type="checkbox" size="m" [ngModel]="done()" (ngModelChange)="done.set(!done())" />
         <span>Топик пройден</span>
       </label>
+      @if (item()?.selfCheck; as check) {
+        <p class="dlg__selfCheck"><span class="dlg__selfCheckLabel">Самопроверка</span> {{ check }}</p>
+      }
     }
     <div class="dlg__actions">
       <button tuiButton type="button" size="m" (click)="finish()">Готово</button>

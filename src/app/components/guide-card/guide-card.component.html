@@ -1,0 +1,219 @@
+<section class="guide" aria-labelledby="guide-title">
+  <div class="guide__head">
+    <h3 id="guide-title" class="card__title guide__h">Ориентир</h3>
+    @if (!editing() && guide()) {
+      <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.pencil" (click)="edit()">Изменить</button>
+    }
+  </div>
+
+  @if (focus(); as current) {
+    <div class="route">
+      <span class="route__label num">Маршрут мастеров · неделя {{ week() }} · блок {{ current.block.fromWeek }}–{{ current.block.toWeek }}</span>
+      @if (item().routeRole === 'study' && current.artist; as artist) {
+        <p class="route__title">
+          @if (artist.url) {
+            <a class="guide__link" [href]="artist.url" target="_blank" rel="noopener noreferrer">{{ artist.name }}</a>
+          } @else {
+            {{ artist.name }}
+          }
+        </p>
+        <p class="route__line"><span class="guide__k">Забираешь</span> {{ artist.takeaway }}</p>
+        <p class="route__line"><span class="guide__k">Смотреть</span> {{ artist.works }}</p>
+        <ol class="guide__list guide__list_numbered">
+          @for (question of questions; track question) {
+            <li>{{ question }}</li>
+          }
+        </ol>
+      } @else if (item().routeRole === 'copy') {
+        <p class="route__title">{{ current.block.copyTask }}</p>
+        <p class="route__line"><span class="guide__k">Техника</span> {{ current.block.copyTechnique }}</p>
+      }
+    </div>
+  } @else if (item().routeRole) {
+    <p class="muted guide__p">Неделя вне маршрута мастеров — выбери художника сам. Маршрут редактируется в «Программа → Маршрут».</p>
+  }
+
+  @if (editing()) {
+    <form class="guideForm" novalidate (submit)="$event.preventDefault(); save()">
+      <label class="field">
+        <span class="field__label">Цель — что умеешь после топика</span>
+        <input class="input" type="text" [maxLength]="limits.goal" [value]="draft().goal" (input)="patch({ goal: text($event) })" />
+        @if (errors().goal) {
+          <span class="field__error" role="alert">{{ errors().goal }}</span>
+        }
+      </label>
+      <label class="field">
+        <span class="field__label">Задание сессии</span>
+        <textarea class="input" rows="2" [value]="draft().task" (input)="patch({ task: text($event) })"></textarea>
+      </label>
+
+      <fieldset class="guideForm__group">
+        <legend class="field__label">Шаги сессии · {{ draftTotal() }} мин</legend>
+        @for (entry of draft().steps; track $index; let index = $index) {
+          <div class="guideForm__row">
+            <input class="input guideForm__grow" type="text" aria-label="Шаг" placeholder="Что делаешь" [value]="entry.title" (input)="setStep(index, { title: text($event) })" />
+            <input class="input guideForm__min num" type="number" min="1" [max]="limits.stepMinutesMax" step="1" aria-label="Минуты" [value]="entry.minutes" (input)="setStep(index, { minutes: number($event) })" />
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" (click)="removeStep(index)">Удалить шаг</button>
+          </div>
+        }
+        @if (draft().steps.length < limits.stepsMax) {
+          <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.plus" (click)="addStep()">Шаг</button>
+        }
+        @if (errors().steps) {
+          <span class="field__error" role="alert">{{ errors().steps }}</span>
+        }
+      </fieldset>
+
+      <label class="field">
+        <span class="field__label">Стоп-критерий</span>
+        <input class="input" type="text" [value]="draft().stopCriterion" (input)="patch({ stopCriterion: text($event) })" />
+      </label>
+
+      <fieldset class="guideForm__group">
+        <legend class="field__label">Смотри — главы, уроки, видео</legend>
+        @for (entry of draft().links; track $index; let index = $index) {
+          <div class="guideForm__link">
+            <input class="input" type="text" aria-label="Название ссылки" placeholder="Название" [value]="entry.title" (input)="setLink('links', index, { title: text($event) })" />
+            <input class="input" type="url" aria-label="Адрес ссылки" placeholder="https://" [value]="entry.url" (input)="setLink('links', index, { url: text($event) })" />
+            <input class="input" type="text" aria-label="Глава или урок" placeholder="гл. 1–5" [value]="entry.locator" (input)="setLink('links', index, { locator: text($event) })" />
+            <select class="input" aria-label="Доступ" (change)="setLink('links', index, { access: access($event) })">
+              <option value="free" [selected]="entry.access === 'free'">бесплатно</option>
+              <option value="pd" [selected]="entry.access === 'pd'">общественное достояние</option>
+              <option value="paid" [selected]="entry.access === 'paid'">платно</option>
+            </select>
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" (click)="removeLink('links', index)">Удалить ссылку</button>
+          </div>
+        }
+        @if (draft().links.length < limits.links) {
+          <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.plus" (click)="addLink('links')">Ссылка</button>
+        }
+        @if (errors().links) {
+          <span class="field__error" role="alert">{{ errors().links }}</span>
+        }
+      </fieldset>
+
+      <fieldset class="guideForm__group">
+        <legend class="field__label">Референсы — что держать перед глазами</legend>
+        @for (entry of draft().references; track $index; let index = $index) {
+          <div class="guideForm__row">
+            <input class="input guideForm__grow" type="text" aria-label="Референс" placeholder="Название или предмет" [value]="entry.title" (input)="setLink('references', index, { title: text($event) })" />
+            <input class="input guideForm__grow" type="url" aria-label="Ссылка на референс" placeholder="https:// — необязательно" [value]="entry.url" (input)="setLink('references', index, { url: text($event) })" />
+            <button tuiIconButton type="button" size="xs" appearance="flat" iconStart="@tui.x" (click)="removeLink('references', index)">Удалить референс</button>
+          </div>
+        }
+        @if (draft().references.length < limits.references) {
+          <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.plus" (click)="addLink('references')">Референс</button>
+        }
+        @if (errors().references) {
+          <span class="field__error" role="alert">{{ errors().references }}</span>
+        }
+      </fieldset>
+
+      <label class="field">
+        <span class="field__label">Ловушки — по одной на строку, до {{ limits.pitfalls }}</span>
+        <textarea class="input" rows="3" [value]="draft().pitfalls" (input)="patch({ pitfalls: text($event) })"></textarea>
+        @if (errors().pitfalls) {
+          <span class="field__error" role="alert">{{ errors().pitfalls }}</span>
+        }
+      </label>
+
+      @if (mismatch(); as diff) {
+        <div class="guide__warn" role="alert">
+          <span class="num">Шаги — {{ diff.steps }} мин, оценка сессии — {{ diff.session }} мин.</span>
+          <div class="guide__warnActions">
+            <button tuiButton type="button" size="xs" appearance="secondary" (click)="resolveMismatch(true)">Обновить оценку</button>
+            <button tuiButton type="button" size="xs" appearance="flat" (click)="resolveMismatch(false)">Оставить</button>
+          </div>
+        </div>
+      }
+
+      <div class="guideForm__actions">
+        <button tuiButton type="submit" size="s">Сохранить ориентир</button>
+        <button tuiButton type="button" size="s" appearance="flat" (click)="cancel()">Отмена</button>
+        @if (guide()) {
+          <button tuiButton type="button" size="s" appearance="flat" class="guideForm__remove" (click)="remove()">Удалить ориентир</button>
+        }
+      </div>
+    </form>
+  } @else if (guide(); as current) {
+    <p class="guide__goal">{{ current.goal }}</p>
+    @if (task()) {
+      <p class="guide__p"><span class="guide__k">Задание</span> {{ task() }}</p>
+    }
+    @if (current.steps.length > 0) {
+      <ol class="guide__steps">
+        @for (entry of current.steps; track $index) {
+          <li class="guide__step">
+            <span>{{ entry.title }}</span>
+            <span class="muted num">{{ entry.minutes }} мин</span>
+          </li>
+        }
+      </ol>
+      <p class="guide__meta muted num">Шаги сессии — {{ total() }} мин, в таймере масштабируются под длину блока</p>
+    }
+    @if (current.stopCriterion) {
+      <p class="guide__p"><span class="guide__k">Стоп-критерий</span> {{ current.stopCriterion }}</p>
+    }
+    @if (current.links.length > 0) {
+      <div class="guide__group">
+        <span class="guide__k">Смотри</span>
+        <ul class="guide__list">
+          @for (entry of current.links; track $index) {
+            <li>
+              <a class="guide__link" [href]="entry.url" target="_blank" rel="noopener noreferrer">{{ entry.title }}</a>
+              @if (entry.locator) {
+                <span class="muted"> · {{ entry.locator }}</span>
+              }
+              <span class="guide__badge" [attr.data-access]="entry.access">{{ accessLabel[entry.access] }}</span>
+            </li>
+          }
+        </ul>
+      </div>
+    }
+    @if (current.references.length > 0 || photos().length > 0) {
+      <div class="guide__group">
+        <span class="guide__k">Референсы</span>
+        <ul class="guide__list">
+          @for (entry of current.references; track $index) {
+            <li>
+              @if (entry.url) {
+                <a class="guide__link" [href]="entry.url" target="_blank" rel="noopener noreferrer">{{ entry.title }}</a>
+              } @else {
+                {{ entry.title }}
+              }
+            </li>
+          }
+        </ul>
+      </div>
+    }
+    <div class="guide__photos">
+      @for (asset of photos(); track asset.id) {
+        <figure class="guide__photo">
+          <img [src]="asset.dataUrl" alt="Референс ориентира" loading="lazy" />
+          <button tuiIconButton type="button" size="xs" appearance="secondary" iconStart="@tui.x" class="guide__photoRemove" (click)="removePhoto(asset.id)">Удалить фото</button>
+        </figure>
+      }
+      @if (photos().length < limits.photos) {
+        <label class="guide__add">
+          <input class="visuallyHidden" type="file" accept="image/*" multiple (change)="onPhotos($event)" />
+          <span>+ Фото-референс</span>
+        </label>
+      }
+    </div>
+    @if (current.pitfalls.length > 0) {
+      <div class="guide__group">
+        <span class="guide__k">Ловушки</span>
+        <ul class="guide__list">
+          @for (entry of current.pitfalls; track $index) {
+            <li>{{ entry }}</li>
+          }
+        </ul>
+      </div>
+    }
+  } @else {
+    <div class="guide__empty">
+      <p class="muted guide__p">У топика нет ориентира: цели, шагов и ссылок на сессию.</p>
+      <button tuiButton type="button" size="s" appearance="secondary" iconStart="@tui.plus" (click)="edit()">Добавить ориентир</button>
+    </div>
+  }
+</section>

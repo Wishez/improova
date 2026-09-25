@@ -33,6 +33,18 @@
   @apply text-meta text-text-3;
 }
 
+.focus__link {
+  @apply text-accent underline underline-offset-2;
+}
+
+.stepBar {
+  @apply flex flex-wrap items-center justify-between gap-2 text-meta text-text-2;
+}
+
+.stepBar__actions {
+  @apply flex gap-2;
+}
+
 .focus__actions {
   @apply flex justify-center gap-3;
 }

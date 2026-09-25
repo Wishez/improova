@@ -1,0 +1,153 @@
+@reference '../../../tailwind.css';
+
+:host {
+  @apply block;
+}
+
+.guide {
+  @apply flex flex-col gap-3 rounded-card border border-border bg-surface-1 p-4;
+}
+
+.guide__head {
+  @apply flex items-center justify-between gap-2;
+}
+
+.guide__h {
+  @apply m-0;
+}
+
+.guide__goal {
+  @apply m-0 text-body font-semibold text-text-1;
+}
+
+.guide__p {
+  @apply m-0 text-body text-text-2;
+}
+
+.guide__k {
+  @apply mr-1 text-meta font-semibold tracking-wide text-text-3 uppercase;
+}
+
+.guide__meta {
+  @apply m-0 text-meta;
+}
+
+.guide__steps {
+  @apply m-0 flex list-decimal flex-col gap-1 pl-5 text-body text-text-1;
+}
+
+.guide__step {
+  @apply pl-1;
+
+  span + span {
+    @apply ml-2;
+  }
+}
+
+.guide__group {
+  @apply flex flex-col gap-1;
+}
+
+.guide__list {
+  @apply m-0 flex list-disc flex-col gap-1 pl-5 text-body text-text-2;
+}
+
+.guide__list_numbered {
+  @apply list-decimal text-meta;
+}
+
+.guide__link {
+  @apply text-text-1 underline decoration-text-3 underline-offset-2 hover:decoration-accent;
+}
+
+.guide__badge {
+  @apply ml-2 rounded-control bg-surface-2 px-1.5 py-0.5 text-micro text-text-3;
+}
+
+.guide__badge[data-access='pd'] {
+  @apply text-success;
+}
+
+.guide__badge[data-access='paid'] {
+  @apply text-warning;
+}
+
+.guide__photos {
+  @apply flex flex-wrap gap-2;
+}
+
+.guide__photo {
+  @apply relative m-0 h-20 w-20 overflow-hidden rounded-control;
+
+  img {
+    @apply h-full w-full object-cover;
+  }
+}
+
+.guide__photoRemove {
+  @apply absolute top-1 right-1;
+}
+
+.guide__add {
+  @apply flex h-20 w-20 cursor-pointer items-center justify-center rounded-control border border-dashed border-border-control p-2 text-center text-meta text-text-3 hover:text-text-1;
+}
+
+.guide__empty {
+  @apply flex flex-col items-start gap-2;
+}
+
+.guide__warn {
+  @apply flex flex-col gap-2 rounded-control border border-warning/40 bg-warning/10 p-3 text-meta text-text-1;
+}
+
+.guide__warnActions {
+  @apply flex gap-2;
+}
+
+.route {
+  @apply flex flex-col gap-1 rounded-control bg-surface-2 p-3;
+}
+
+.route__label {
+  @apply text-micro text-text-3;
+}
+
+.route__title {
+  @apply m-0 text-body font-semibold text-text-1;
+}
+
+.route__line {
+  @apply m-0 text-meta text-text-2;
+}
+
+.guideForm {
+  @apply flex flex-col gap-3;
+}
+
+.guideForm__group {
+  @apply m-0 flex min-w-0 flex-col gap-2 border-0 p-0;
+}
+
+.guideForm__row {
+  @apply flex items-center gap-2;
+}
+
+.guideForm__grow {
+  @apply min-w-0 flex-1;
+}
+
+.guideForm__min {
+  @apply w-20 shrink-0;
+}
+
+.guideForm__link {
+  @apply grid grid-cols-2 items-center gap-2 border-b border-border pb-2;
+}
+
+.guideForm__actions {
+  @apply flex flex-wrap gap-2;
+}
+
+.guideForm__remove {
+  @apply ml-auto;
+}
