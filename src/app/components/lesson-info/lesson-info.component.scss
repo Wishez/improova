@@ -1,0 +1,77 @@
+@reference '../../../tailwind.css';
+
+:host {
+  @apply block;
+}
+
+.lesson {
+  @apply flex flex-col gap-4 rounded-card border border-border bg-surface-1 p-4;
+}
+
+.lesson__crumbs {
+  @apply m-0 flex flex-wrap items-center gap-1.5 text-meta text-text-2;
+}
+
+.lesson__block {
+  @apply flex flex-col gap-2;
+}
+
+.lesson__h {
+  @apply m-0 text-meta font-semibold tracking-wide text-text-3 uppercase;
+}
+
+.lesson__p {
+  @apply m-0 text-body text-text-2;
+}
+
+.lesson__k {
+  @apply mr-1 text-meta font-semibold text-text-3;
+}
+
+.lesson__list {
+  @apply m-0 flex list-none flex-col gap-2 p-0;
+}
+
+.lesson__ref {
+  @apply flex flex-col gap-0.5 text-body text-text-1;
+}
+
+.lesson__link {
+  @apply text-text-1 underline decoration-text-3 underline-offset-2 hover:decoration-accent;
+}
+
+.lesson__range {
+  @apply text-meta text-text-2;
+}
+
+.lesson__meta {
+  @apply flex flex-wrap items-center gap-1.5 text-meta text-text-3;
+}
+
+.lesson__alt {
+  @apply text-meta text-text-2 underline;
+}
+
+.lesson__note {
+  @apply rounded-control bg-surface-2 px-3 py-2;
+}
+
+.lesson__noteHead {
+  @apply cursor-pointer text-meta text-text-2;
+}
+
+.lesson__noteBody {
+  @apply mt-2 text-body;
+}
+
+.lesson__compare {
+  @apply grid grid-cols-2 gap-2;
+}
+
+.lesson__figure {
+  @apply m-0 flex flex-col gap-1;
+}
+
+.lesson__img {
+  @apply aspect-square w-full rounded-control object-cover;
+}

@@ -2,11 +2,11 @@ import { FormsModule } from '@angular/forms';
 import { ChangeDetectionStrategy, Component, ElementRef, HostListener, computed, effect, inject, signal, viewChild } from '@angular/core';
 import { TuiButton, TuiCheckbox, TuiDialog } from '@taiga-ui/core';
 import { TuiSwitch } from '@taiga-ui/kit';
-import { estimateFromResource, isCountable, reviewState } from '../../domain';
+import { estimateFromResource, isCountable, reviewState, topicBeforeAfter } from '../../domain';
 import { DayShortPipe, MarkdownPipe, MinutesPipe } from '../../pipes';
 import { DataStore, NotesService, PlanService, ProgramService, TimerService, UiStateService } from '../../services';
 import type { IResourceRef, TItemKind } from '../../types';
-import { RESOURCE_TYPE_LABEL, toDayKey } from '../../utils';
+import { RESOURCE_TYPE_LABEL } from '../../utils';
 import { GuideCardComponent } from '../guide-card/guide-card.component';
 import { LogListComponent } from '../log-list/log-list.component';
 import { NoteEditorComponent } from '../note-editor/note-editor.component';
@@ -72,21 +72,15 @@ export class ItemDrawerComponent {
   /** «Было / стало»: первое и последнее фото темы из разных дней (FR-17). */
   protected readonly gallery = computed(() => {
     const topic = this.topic();
-    if (!topic) {
-      return null;
-    }
-    const itemIds = new Set(this.store.data().items.filter((entry) => entry.topicId === topic.id).map((entry) => entry.id));
-    const assets = this.store.assetsById();
-    const boundary = this.store.settings().dayBoundaryHour;
-    const photos = this.store
-      .data()
-      .notes.filter((note) => note.itemId !== null && itemIds.has(note.itemId))
-      .flatMap((note) => note.imageIds.map((id) => ({ asset: assets.get(id), day: toDayKey(new Date(note.createdAt), boundary) })))
-      .flatMap((entry) => (entry.asset ? [{ asset: entry.asset, day: entry.day }] : []))
-      .sort((a, b) => a.day.localeCompare(b.day));
-    const first = photos[0];
-    const last = photos.at(-1);
-    return first && last && first.day !== last.day ? { first, last } : null;
+    return topic
+      ? topicBeforeAfter({
+          topicId: topic.id,
+          items: this.store.data().items,
+          notes: this.store.data().notes,
+          assets: this.store.assetsById(),
+          boundaryHour: this.store.settings().dayBoundaryHour,
+        })
+      : null;
   });
 
   protected readonly editingDescription = signal(false);

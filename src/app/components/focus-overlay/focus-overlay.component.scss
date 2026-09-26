@@ -19,7 +19,7 @@
 }
 
 .focus__guide {
-  @apply min-w-0 xl:sticky xl:top-0 xl:col-span-2 xl:max-h-screen xl:overflow-y-auto;
+  @apply flex min-w-0 flex-col gap-4 xl:sticky xl:top-0 xl:col-span-2 xl:max-h-screen xl:overflow-y-auto;
 }
 
 .focus__total {

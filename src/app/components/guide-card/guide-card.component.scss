@@ -36,6 +36,10 @@
   @apply m-0 flex list-decimal flex-col gap-1 pl-5 text-body text-text-1;
 }
 
+.guide__step_active {
+  @apply font-semibold text-accent;
+}
+
 .guide__step {
   @apply pl-1;
 

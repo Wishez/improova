@@ -1,4 +1,5 @@
-import type { IItem, ISection, ITimeLog, ITopic } from '../types';
+import type { IAsset, IItem, INote, ISection, ITimeLog, ITopic } from '../types';
+import { toDayKey } from '../utils';
 
 /** Упорядоченная активная программа: разделы → темы → топики без архивных. */
 export interface IProgramTree {
@@ -63,4 +64,28 @@ export function spentByItem(logs: readonly ITimeLog[]): ReadonlyMap<string, numb
 
 export function isCountable(item: IItem): boolean {
   return item.recurrenceWeeks === null && !item.archived;
+}
+
+export interface IDatedPhoto {
+  readonly asset: IAsset;
+  readonly day: string;
+}
+
+/** «Было / стало» темы: первое и последнее фото из заметок её топиков, из разных дней (FR-17). */
+export function topicBeforeAfter(params: {
+  readonly topicId: string;
+  readonly items: readonly IItem[];
+  readonly notes: readonly INote[];
+  readonly assets: ReadonlyMap<string, IAsset>;
+  readonly boundaryHour: number;
+}): { readonly first: IDatedPhoto; readonly last: IDatedPhoto } | null {
+  const itemIds = new Set(params.items.filter((entry) => entry.topicId === params.topicId).map((entry) => entry.id));
+  const photos = params.notes
+    .filter((note) => note.itemId !== null && itemIds.has(note.itemId))
+    .flatMap((note) => note.imageIds.map((id) => ({ asset: params.assets.get(id), day: toDayKey(new Date(note.createdAt), params.boundaryHour) })))
+    .flatMap((entry) => (entry.asset ? [{ asset: entry.asset, day: entry.day }] : []))
+    .sort((a, b) => a.day.localeCompare(b.day));
+  const first = photos[0];
+  const last = photos.at(-1);
+  return first && last && first.day !== last.day ? { first, last } : null;
 }

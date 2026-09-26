@@ -140,13 +140,13 @@
     </form>
   } @else if (guide(); as current) {
     <p class="guide__goal">{{ current.goal }}</p>
-    @if (task() && !session()) {
+    @if (task()) {
       <p class="guide__p"><span class="guide__k">Задание</span> {{ task() }}</p>
     }
-    @if (current.steps.length > 0 && !session()) {
+    @if (current.steps.length > 0) {
       <ol class="guide__steps">
-        @for (entry of current.steps; track $index) {
-          <li class="guide__step">
+        @for (entry of current.steps; track $index; let index = $index) {
+          <li class="guide__step" [class.guide__step_active]="index === activeStep()" [attr.aria-current]="index === activeStep() ? 'step' : null">
             <span>{{ entry.title }}</span>
             <span class="muted num">{{ entry.minutes }} мин</span>
           </li>

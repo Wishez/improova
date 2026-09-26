@@ -1,0 +1,99 @@
+<div class="lesson">
+  @if (section(); as currentSection) {
+    <p class="lesson__crumbs">
+      <span [class]="'sectionDot sectionDot_' + currentSection.colorToken"></span>
+      {{ currentSection.title }}
+      @if (topic(); as currentTopic) {
+        <span class="muted">›</span> {{ currentTopic.title }}
+      }
+    </p>
+  }
+
+  @if (topic()?.description; as description) {
+    <section class="lesson__block">
+      <h3 class="lesson__h">О теме</h3>
+      <div class="markdown" [innerHTML]="description | markdown"></div>
+    </section>
+  }
+
+  @if (refs().length > 0) {
+    <section class="lesson__block">
+      <h3 class="lesson__h">Ресурсы</h3>
+      <ul class="lesson__list">
+        @for (entry of refs(); track entry.ref.resourceId) {
+          <li class="lesson__ref">
+            @if (entry.resource; as resource) {
+              @if (resource.url) {
+                <a class="lesson__link" [href]="resource.url" target="_blank" rel="noopener noreferrer">{{ resource.title }}</a>
+              } @else {
+                <span>{{ resource.title }}</span>
+              }
+              @if (entry.ref.range) {
+                <span class="lesson__range">{{ entry.ref.range }}</span>
+              }
+              <span class="lesson__meta">
+                {{ typeLabel[resource.type] }}{{ resource.author ? ' · ' + resource.author : '' }}
+                <span class="tag" [class.tag_pd]="resource.access === 'pd'" [class.tag_paid]="resource.access === 'paid'">{{ accessLabel[resource.access] }}</span>
+              </span>
+              @if (resource.access === 'paid' && resource.freeAlternativeUrl) {
+                <a class="lesson__alt" [href]="resource.freeAlternativeUrl" target="_blank" rel="noopener noreferrer">Бесплатная замена</a>
+              }
+            } @else {
+              <span class="muted">Ресурс удалён</span>
+            }
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  @if (item().selfCheck) {
+    <section class="lesson__block">
+      <h3 class="lesson__h">Самопроверка</h3>
+      <p class="lesson__p">{{ item().selfCheck }}</p>
+    </section>
+  }
+
+  @if (notes().length > 0) {
+    <section class="lesson__block">
+      <h3 class="lesson__h">Прошлые заметки</h3>
+      <ul class="lesson__list">
+        @for (entry of notes(); track entry.note.id) {
+          <li class="lesson__note">
+            <details [open]="$first">
+              <summary class="lesson__noteHead num">{{ entry.day | dayShort }}</summary>
+              @if (entry.note.body) {
+                <div class="markdown lesson__noteBody" [innerHTML]="entry.note.body | markdown"></div>
+              }
+              @if (entry.note.worked) {
+                <p class="lesson__p"><span class="lesson__k">Получилось</span> {{ entry.note.worked }}</p>
+              }
+              @if (entry.note.failed) {
+                <p class="lesson__p"><span class="lesson__k">Не вышло</span> {{ entry.note.failed }}</p>
+              }
+              @if (entry.note.next) {
+                <p class="lesson__p"><span class="lesson__k">Задача</span> {{ entry.note.next }}</p>
+              }
+            </details>
+          </li>
+        }
+      </ul>
+    </section>
+  }
+
+  @if (gallery(); as photos) {
+    <section class="lesson__block">
+      <h3 class="lesson__h">Было / стало</h3>
+      <div class="lesson__compare">
+        <figure class="lesson__figure">
+          <img class="lesson__img" [src]="photos.first.asset.dataUrl" alt="Первая работа по теме" loading="lazy" />
+          <figcaption class="lesson__meta">{{ photos.first.day | dayShort }}</figcaption>
+        </figure>
+        <figure class="lesson__figure">
+          <img class="lesson__img" [src]="photos.last.asset.dataUrl" alt="Последняя работа по теме" loading="lazy" />
+          <figcaption class="lesson__meta">{{ photos.last.day | dayShort }}</figcaption>
+        </figure>
+      </div>
+    </section>
+  }
+</div>

@@ -77,8 +77,9 @@
         </div>
       </div>
       @if (item(); as current) {
-        <aside class="focus__guide" aria-label="Ориентир">
-          <app-guide-card [item]="current" [session]="true" />
+        <aside class="focus__guide" aria-label="Карточка урока">
+          <app-guide-card [item]="current" [session]="true" [activeStep]="timer.guideSteps() ? timer.phaseIndex() : null" />
+          <app-lesson-info [item]="current" />
         </aside>
       }
     </div>

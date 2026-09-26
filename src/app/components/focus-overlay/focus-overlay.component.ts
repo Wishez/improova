@@ -3,6 +3,7 @@ import { TuiButton } from '@taiga-ui/core';
 import { CourseService, SessionDraftService, TimerService, UiStateService, stepEnd } from '../../services';
 import { SESSION_TYPE_LABEL } from '../../utils';
 import { GuideCardComponent } from '../guide-card/guide-card.component';
+import { LessonInfoComponent } from '../lesson-info/lesson-info.component';
 import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.component';
 
 /**
@@ -11,7 +12,7 @@ import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.comp
  */
 @Component({
   selector: 'app-focus-overlay',
-  imports: [TuiButton, GuideCardComponent, MarkdownEditorComponent],
+  imports: [TuiButton, GuideCardComponent, LessonInfoComponent, MarkdownEditorComponent],
   templateUrl: './focus-overlay.component.html',
   styleUrl: './focus-overlay.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
