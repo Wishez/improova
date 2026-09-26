@@ -1,9 +1,11 @@
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { TuiButton } from '@taiga-ui/core';
-import { ANALYSIS_QUESTIONS, EMPTY_GUIDE, GUIDE_LIMITS, stepsTotal, validateGuide, type TGuideField } from '../../domain';
+import { ANALYSIS_QUESTIONS, EMPTY_GUIDE, GUIDE_LIMITS, resolveGuide, stepsTotal, validateGuide, type TGuideField } from '../../domain';
+import { TECHNIQUES } from '../../seed';
 import { CourseService, DataStore, ProgramService } from '../../services';
 import type { IGuide, IGuideLink, IGuideStep, IItem, TLinkAccess } from '../../types';
 import { ACCESS_LABEL } from '../../utils';
+import { TechniqueCardComponent } from '../technique-card/technique-card.component';
 
 interface IGuideDraft {
   goal: string;
@@ -27,10 +29,13 @@ const toDraft = (guide: IGuide): IGuideDraft => ({
 
 const emptyLink = (): IGuideLink => ({ title: '', url: '', locator: '', access: 'free' });
 
-/** Ориентир топика в карточке: просмотр и редактирование по полям (FR-37), блок маршрута мастеров (FR-39). */
+/**
+ * Ориентир топика в карточке: просмотр и редактирование по полям (FR-37), блок маршрута мастеров (FR-39),
+ * «Как делать» у шагов и задания из справочника приёмов (FR-48, FR-49).
+ */
 @Component({
   selector: 'app-guide-card',
-  imports: [TuiButton],
+  imports: [TuiButton, TechniqueCardComponent],
   templateUrl: './guide-card.component.html',
   styleUrl: './guide-card.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -63,6 +68,19 @@ export class GuideCardComponent {
   protected readonly guide = computed(() => this.item().guide);
   protected readonly task = computed(() => this.course.taskOf(this.item()));
   protected readonly total = computed(() => stepsTotal(this.guide() ?? EMPTY_GUIDE));
+  /** Шаги с карточками приёмов; техника квартала — из блока маршрута на сегодня (FR-49). */
+  protected readonly resolved = computed(() => {
+    const guide = this.guide();
+    if (!guide) {
+      return null;
+    }
+    return resolveGuide({
+      steps: guide.steps,
+      task: this.task(),
+      routeTechniqueName: this.course.focus()?.block.copyTechnique ?? null,
+      catalog: TECHNIQUES,
+    });
+  });
   protected readonly focus = computed(() => (this.item().routeRole ? this.course.focus() : null));
   protected readonly week = this.course.week;
   protected readonly photos = computed(() => {

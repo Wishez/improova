@@ -37,15 +37,23 @@
 }
 
 .guide__step_active {
+  @apply marker:text-accent;
+}
+
+.guide__step_active .guide__stepRow {
   @apply font-semibold text-accent;
 }
 
 .guide__step {
-  @apply pl-1;
+  @apply flex flex-col gap-1 pl-1;
+}
 
-  span + span {
-    @apply ml-2;
-  }
+.guide__stepRow {
+  @apply flex flex-wrap items-baseline gap-x-2;
+}
+
+.guide__hint {
+  @apply m-0 text-meta;
 }
 
 .guide__group {

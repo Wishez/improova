@@ -4,6 +4,7 @@
     <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'program'" [attr.aria-selected]="tab() === 'program'" (click)="tab.set('program')">Разделы</button>
     <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'resources'" [attr.aria-selected]="tab() === 'resources'" (click)="tab.set('resources')">Ресурсы</button>
     <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'route'" [attr.aria-selected]="tab() === 'route'" (click)="tab.set('route')">Маршрут</button>
+    <button type="button" role="tab" class="tabs__tab" [class.tabs__tab_active]="tab() === 'techniques'" [attr.aria-selected]="tab() === 'techniques'" (click)="tab.set('techniques')">Приёмы</button>
   </div>
 </header>
 
@@ -11,6 +12,8 @@
   <app-resources-panel />
 } @else if (tab() === 'route') {
   <app-route-panel />
+} @else if (tab() === 'techniques') {
+  <app-techniques-panel />
 } @else {
   <div class="toolbar">
     <tui-segmented size="s" class="toolbar__filter" [activeItemIndex]="filterIndex()" (activeItemIndexChange)="setFilter($event)">

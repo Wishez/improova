@@ -1,0 +1,49 @@
+<section class="techniques" aria-labelledby="techniques-title">
+  <div class="techniques__bar">
+    <div>
+      <h2 id="techniques-title" class="card__title techniques__h">Приёмы</h2>
+      <p class="muted techniques__p num">
+        {{ total }} карточек: что это, как делать по шагам, как проверить себя и где почитать. Те же
+        карточки открываются у шагов ориентира и в режиме фокуса.
+      </p>
+    </div>
+    <input
+      class="input techniques__search"
+      type="search"
+      placeholder="Поиск приёма"
+      aria-label="Поиск приёма"
+      [value]="query()"
+      (input)="query.set(text($event))"
+    />
+  </div>
+
+  @for (group of groups(); track group.id) {
+    <section class="tGroup" [attr.aria-label]="group.label">
+      <h3 class="tGroup__h">{{ group.label }}</h3>
+      <ul class="tGroup__list">
+        @for (entry of group.cards; track entry.technique.key) {
+          <li class="tCard">
+            <app-technique-card [technique]="entry.technique" prefix="" />
+            @if (entry.usage.length > 0) {
+              <div class="tCard__usage">
+                <span class="tCard__k">Где используется</span>
+                @for (use of entry.usage; track use.topic.id) {
+                  <button type="button" class="tCard__topic" (click)="open(use)">
+                    {{ use.topic.title }}
+                  </button>
+                }
+              </div>
+            }
+          </li>
+        }
+      </ul>
+    </section>
+  } @empty {
+    <div class="techniques__empty">
+      <p class="muted techniques__p">Ничего не найдено по запросу «{{ query() }}».</p>
+      <button tuiButton type="button" size="s" appearance="secondary" (click)="query.set('')">
+        Сбросить поиск
+      </button>
+    </div>
+  }
+</section>

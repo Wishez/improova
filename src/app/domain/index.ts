@@ -8,3 +8,4 @@ export * from './program';
 export * from './progress';
 export * from './reviews';
 export * from './stats';
+export * from './techniques';

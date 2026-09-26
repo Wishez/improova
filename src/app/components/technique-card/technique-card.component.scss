@@ -1,0 +1,81 @@
+@reference '../../../tailwind.css';
+
+:host {
+  @apply block;
+}
+
+.how {
+  @apply rounded-control bg-surface-2 text-body;
+}
+
+.how__summary {
+  @apply flex cursor-pointer list-none items-start gap-1.5 rounded-control px-3 py-1.5 text-meta text-text-2 hover:text-text-1;
+
+  &::-webkit-details-marker {
+    @apply hidden;
+  }
+
+  &:focus-visible {
+    @apply outline-2 outline-offset-2 outline-accent;
+  }
+}
+
+.how__chevron {
+  @apply mt-0.5 h-3 w-3 shrink-0 fill-none stroke-current stroke-2 transition-transform;
+}
+
+.how[open] .how__chevron {
+  @apply rotate-90;
+}
+
+.how__label {
+  @apply min-w-0;
+}
+
+.how__prefix {
+  @apply mr-1 font-semibold text-text-3;
+}
+
+.how__title {
+  @apply font-semibold text-text-1;
+}
+
+.how__body {
+  @apply flex flex-col gap-2 px-3 pt-1 pb-3;
+}
+
+.how__p {
+  @apply m-0 text-body text-text-2;
+}
+
+.how__k {
+  @apply mr-1 text-meta font-semibold tracking-wide text-text-3 uppercase;
+}
+
+.how__group {
+  @apply flex flex-col gap-1;
+}
+
+.how__list {
+  @apply m-0 flex list-disc flex-col gap-1 pl-5 text-body text-text-2;
+}
+
+.how__list_numbered {
+  @apply list-decimal text-text-1;
+}
+
+.how__safety {
+  @apply m-0 rounded-control border border-warning/40 bg-warning/10 px-3 py-2 text-meta text-text-1;
+}
+
+.how__link {
+  @apply text-text-1 underline decoration-text-3 underline-offset-2 hover:decoration-accent;
+}
+
+.how__lang {
+  @apply ml-1 text-micro text-text-3;
+}
+
+.how__meta {
+  @apply m-0 text-micro text-text-3;
+}

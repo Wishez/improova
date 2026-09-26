@@ -1,0 +1,60 @@
+@let card = technique();
+<details class="how">
+  <summary class="how__summary">
+    <svg class="how__chevron" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 4l4 4-4 4" /></svg>
+    <span class="how__label">
+      @if (prefix()) {
+        <span class="how__prefix">{{ prefix() }}:</span>
+      }
+      <span class="how__title">{{ card.title }}</span>
+    </span>
+  </summary>
+  <div class="how__body">
+    <p class="how__p" [innerHTML]="card.what | markdownInline"></p>
+    <p class="how__p"><span class="how__k">Зачем</span> {{ card.why }}</p>
+    <p class="how__p"><span class="how__k">Понадобится</span> {{ card.materials }}</p>
+    <div class="how__group">
+      <span class="how__k">Как делать</span>
+      <ol class="how__list how__list_numbered">
+        @for (entry of card.steps; track $index) {
+          <li [innerHTML]="entry | markdownInline"></li>
+        }
+      </ol>
+    </div>
+    @if (card.safety) {
+      <p class="how__safety" role="note">
+        <span class="how__k">Безопасность</span> {{ card.safety }}
+      </p>
+    }
+    <p class="how__p"><span class="how__k">Проверь себя</span> {{ card.check }}</p>
+    <div class="how__group">
+      <span class="how__k">Частые ошибки</span>
+      <ul class="how__list">
+        @for (entry of card.mistakes; track $index) {
+          <li>{{ entry }}</li>
+        }
+      </ul>
+    </div>
+    <div class="how__group">
+      <span class="how__k">Где почитать</span>
+      <ul class="how__list">
+        @for (source of card.sources; track source.url) {
+          <li>
+            <a class="how__link" [href]="source.url" target="_blank" rel="noopener noreferrer">{{
+              source.title
+            }}</a>
+            <span class="muted"> · {{ source.locator }}</span>
+            <span
+              class="tag"
+              [class.tag_pd]="source.access === 'pd'"
+              [class.tag_paid]="source.access === 'paid'"
+              >{{ source.accessNote || accessLabel[source.access] }}</span
+            >
+            <span class="how__lang">{{ langLabel[source.lang] }}</span>
+          </li>
+        }
+      </ul>
+    </div>
+    <p class="how__meta num">Карточка {{ card.number }} · справочник курса v{{ courseVersion }}</p>
+  </div>
+</details>

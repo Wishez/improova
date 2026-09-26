@@ -12,5 +12,6 @@ export * from './resource';
 export * from './route-block';
 export * from './section';
 export * from './snapshot';
+export * from './technique';
 export * from './time-log';
 export * from './topic';

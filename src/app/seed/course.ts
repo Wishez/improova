@@ -2,7 +2,7 @@ import type { ICourse, ICourseItem, ICourseRelease, ICourseResource, ICourseRout
 import { SEED_RESOURCES, SEED_ROUTE, SEED_SECTIONS } from './program.seed';
 
 /** Версия курса в этом релизе (FR-45). Растёт при любом изменении содержания курса. */
-export const COURSE_VERSION = 2;
+export const COURSE_VERSION = 3;
 
 /** Журнал «Что нового»; removedKeys — ключи, убранные в версии. */
 export const COURSE_RELEASES: readonly ICourseRelease[] = [
@@ -18,6 +18,16 @@ export const COURSE_RELEASES: readonly ICourseRelease[] = [
     notes: [
       'Тема «Контрольные работы»: 5 работ — день 66 и конец каждого квартала, в плане закреплённым блоком',
       'У ресурсов указан доступ и легальная бесплатная замена для платных книг',
+    ],
+    removedKeys: [],
+  },
+  {
+    version: 3,
+    date: '2026-09-26',
+    notes: [
+      'Справочник приёмов: 44 карточки «как делать» с шагами, самопроверкой и проверенными бесплатными источниками',
+      'У шагов ориентира и в режиме фокуса — «Как делать» по приёму шага, весь справочник — в «Программа → Приёмы»',
+      'Шаг «Исполнение в технике квартала» показывает технику текущего блока маршрута и её карточку',
     ],
     removedKeys: [],
   },

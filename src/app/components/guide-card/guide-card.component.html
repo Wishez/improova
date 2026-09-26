@@ -143,12 +143,25 @@
     @if (task()) {
       <p class="guide__p"><span class="guide__k">Задание</span> {{ task() }}</p>
     }
+    @for (card of resolved()?.taskTechniques ?? []; track card.key) {
+      <app-technique-card [technique]="card" />
+    }
     @if (current.steps.length > 0) {
       <ol class="guide__steps">
-        @for (entry of current.steps; track $index; let index = $index) {
+        @for (entry of resolved()?.steps ?? []; track $index; let index = $index) {
           <li class="guide__step" [class.guide__step_active]="index === activeStep()" [attr.aria-current]="index === activeStep() ? 'step' : null">
-            <span>{{ entry.title }}</span>
-            <span class="muted num">{{ entry.minutes }} мин</span>
+            <div class="guide__stepRow">
+              <span>{{ entry.label }}</span>
+              <span class="muted num">{{ entry.minutes }} мин</span>
+            </div>
+            @if (entry.route === 'missing') {
+              <p class="guide__hint muted">Техника маршрута не задана на эту дату</p>
+            }
+            @if (!session() || activeStep() === null || index === activeStep()) {
+              @for (card of entry.techniques; track card.key) {
+                <app-technique-card [technique]="card" />
+              }
+            }
           </li>
         }
       </ol>

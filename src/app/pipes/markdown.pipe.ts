@@ -12,3 +12,15 @@ export class MarkdownPipe implements PipeTransform {
     return typeof html === 'string' ? html : '';
   }
 }
+
+/** Строчный markdown (жирный, курсив, ссылки) без абзацев — для пунктов списков и подписей. */
+@Pipe({ name: 'markdownInline' })
+export class MarkdownInlinePipe implements PipeTransform {
+  transform(value: string | null | undefined): string {
+    if (!value) {
+      return '';
+    }
+    const html = marked.parseInline(value, { async: false, gfm: true });
+    return typeof html === 'string' ? html : '';
+  }
+}

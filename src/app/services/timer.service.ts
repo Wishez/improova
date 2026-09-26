@@ -1,7 +1,8 @@
 import { Injectable, computed, effect, inject, signal } from '@angular/core';
-import { stepsTotal } from '../domain';
+import { stepLabel, stepsTotal } from '../domain';
 import type { IGuideStep, ITimerState, TSessionType } from '../types';
 import { formatClock } from '../utils';
+import { CourseService } from './course.service';
 import { DataStore } from './data.store';
 import { LogsService } from './logs.service';
 import { SessionDraftService } from './session-draft.service';
@@ -99,6 +100,7 @@ export class TimerService {
   private readonly toasts = inject(ToastService);
   private readonly ui = inject(UiStateService);
   private readonly draft = inject(SessionDraftService);
+  private readonly course = inject(CourseService);
 
   private readonly tick = signal(Date.now());
   private lastPhaseIndex = -1;
@@ -127,8 +129,13 @@ export class TimerService {
   readonly phases = computed(() => {
     const timer = this.state();
     const steps = this.guideSteps();
+    // Шаг «в технике квартала» называется техникой блока маршрута на сегодня (FR-49): в полосе шагов и в уведомлении
+    const routeTechnique = this.course.focus()?.block.copyTechnique ?? null;
     return steps
-      ? buildGuidePhases({ steps, stepMinutes: timer?.stepMinutes ?? null })
+      ? buildGuidePhases({
+          steps: steps.map((entry) => ({ ...entry, title: stepLabel(entry.title, routeTechnique) })),
+          stepMinutes: timer?.stepMinutes ?? null,
+        })
       : buildPhases(timer?.plannedMin ?? 0);
   });
   /** Длина сессии в минутах: сумма шагов ориентира или план блока. */
