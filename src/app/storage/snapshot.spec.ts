@@ -4,6 +4,7 @@ import { buildProgramTree, minutesByDay, minutesBySection, minutesByType, planWe
 import { budgetFixture, itemFixture, logFixture, programFixture, sectionFixture, topicFixture } from '../domain/test-fixtures';
 import { DataStore, defaultChallenge, defaultMeta } from '../services/data.store';
 import type { ICollections, IItem, ILogSteps, IMeta, ITimeLog, ITimerState, ITimerSteps } from '../types';
+import { createId } from '../utils';
 import { MemoryAdapter } from './memory.adapter';
 import { checkSnapshot, normalizeCollections } from './snapshot';
 import { SCHEMA_VERSION, STORAGE_ADAPTER } from './storage-adapter';
@@ -400,6 +401,95 @@ describe('миграция схемы 4 → 5: данные 1.0–1.5 (FR-65, US
     const current = checks[4];
     expect(current?.ok && current.snapshot.data.timeLogs?.map((log) => log.steps)).toEqual([logSteps(), logSteps({ firstMinuteIndex: null }), null]);
     expect(current?.ok && current.snapshot.data.meta?.[0]?.timer).toMatchObject({ steps: timerSteps(), legacySchedule: false });
+  });
+});
+
+describe('экспорт и импорт сведений о шагах (FR-66, US-32)', () => {
+  const OTHER_CIRCLE = '0192f5c4-6a1b-7c2d-8e3f-00000000beef';
+
+  /** Данные 1.6: сессии одного круга, ручной лог, лог без шагов до 1.6 и идущий таймер с шагами. */
+  async function storageWithSteps(): Promise<MemoryAdapter> {
+    const adapter = new MemoryAdapter();
+    const logs: ITimeLog[] = [
+      steppedLog('first', logSteps({ minutes: [20, 5, 0], stopIndex: 1, firstMinuteIndex: 0 }), '2026-01-05T10:00:00.000Z'),
+      steppedLog('second', logSteps({ minutes: [0, 7, 18], startIndex: 1, stopIndex: 2, continuesCircle: true, firstMinuteIndex: 1 }), '2026-01-06T10:00:00.000Z'),
+      steppedLog('short', logSteps({ minutes: [0, 0, 1], startIndex: 2, stopIndex: 2, continuesCircle: true, firstMinuteIndex: null }), '2026-01-07T10:00:00.000Z'),
+      { ...logFixture({ id: 'manual', itemId: 'i1', type: 'practice', startedAt: '2026-01-07T12:00:00.000Z', minutes: 30 }), source: 'manual', steps: null },
+      { ...logFixture({ id: 'legacy', itemId: 'i1', type: 'study', startedAt: '2026-01-04T12:00:00.000Z', minutes: 40 }), steps: null },
+    ];
+    await adapter.putMany('items', [itemFixture({ id: 'i1', topicId: 't1' })]);
+    await adapter.putMany('timeLogs', logs);
+    await adapter.put('meta', metaWith({ ...legacyTimer(), stepMinutes: null, steps: timerSteps({ circleId: OTHER_CIRCLE, firstMinuteIndex: null }), legacySchedule: false }));
+    return adapter;
+  }
+
+  it('ТК-А22: экспорт 1.6 и импорт «Заменить» в пустое хранилище возвращают те же сведения о шагах, включая firstMinuteIndex', async () => {
+    const source = await storageWithSteps();
+    const check = checkSnapshot(JSON.stringify(await source.exportAll()));
+    expect(check.ok).toBe(true);
+    const target = new MemoryAdapter();
+    if (check.ok) {
+      await target.importAll(check.snapshot, 'replace');
+    }
+    const before = await source.loadAll();
+    const after = await target.loadAll();
+    expect(after).toEqual(before);
+    expect(after.timeLogs.map((log) => log.steps?.firstMinuteIndex)).toEqual([0, 1, null, undefined, undefined]);
+    expect(after.meta[0]?.timer?.steps).toEqual(timerSteps({ circleId: OTHER_CIRCLE, firstMinuteIndex: null }));
+  });
+
+  it('ТК-А22: «Объединить» переносит шаги вместе со своим логом и не теряет их ни у одной стороны', async () => {
+    const file = await storageWithSteps();
+    const target = new MemoryAdapter();
+    const own = steppedLog('own', logSteps({ circleId: OTHER_CIRCLE, minutes: [3, 0, 0], stopIndex: 0, firstMinuteIndex: 0 }), '2026-01-08T10:00:00.000Z');
+    // Та же сессия в браузере старее, чем в файле: побеждает запись файла целиком
+    const olderSecond: ITimeLog = { ...steppedLog('second', logSteps({ minutes: [0, 25, 0], startIndex: 1, continuesCircle: true, firstMinuteIndex: 1 })), updatedAt: '2026-01-01T00:00:00.000Z' };
+    // Правка в браузере новее файла: остаётся запись браузера со своими шагами
+    const newerFirst: ITimeLog = { ...steppedLog('first', logSteps({ minutes: [15, 0, 0], stopIndex: 0, firstMinuteIndex: 0 })), durationMin: 15, updatedAt: '2026-02-01T00:00:00.000Z' };
+    await target.putMany('timeLogs', [own, olderSecond, newerFirst]);
+    const check = checkSnapshot(JSON.stringify(await file.exportAll()));
+    expect(check.ok).toBe(true);
+    if (check.ok) {
+      await target.importAll(check.snapshot, 'merge');
+    }
+    const fromFile = new Map((await file.loadAll()).timeLogs.map((log) => [log.id, log]));
+    const merged = new Map((await target.loadAll()).timeLogs.map((log) => [log.id, log]));
+    expect(merged.get('own')).toEqual(own);
+    expect(merged.get('first')).toEqual(newerFirst);
+    expect(merged.get('second')).toEqual(fromFile.get('second'));
+    expect(merged.get('short')).toEqual(fromFile.get('short'));
+    expect(merged.get('manual')?.steps).toBeNull();
+    expect([...merged.keys()].sort()).toEqual(['first', 'legacy', 'manual', 'own', 'second', 'short']);
+    expect((await target.loadAll()).meta[0]?.timer?.steps?.circleId).toBe(OTHER_CIRCLE);
+  });
+
+  it('ТК-А24: полный экспорт 10 000 логов со сведениями о шагах растёт не больше чем на 2 000 000 байт (ДТ-6)', async () => {
+    const count = 10_000;
+    const start = Date.parse('2025-03-01T10:00:00.000Z');
+    // Худший случай курса: 5 шагов (больше в ориентирах курса нет), двузначные минуты, трёхзначный лимит,
+    // firstMinuteIndex: null и circleId — UUIDv7, как createId. Остальные коллекции в обоих экспортах одинаковы
+    const legacyLogs = Array.from({ length: count }, (_, index) =>
+      logFixture({ id: createId(start + index), itemId: createId(start - index), type: 'practice', startedAt: new Date(start + index * 1_800_000).toISOString(), minutes: 100 }),
+    );
+    const steps = (index: number): ILogSteps => ({
+      minutes: [12, 24, 18, 30, 16],
+      startIndex: 0,
+      stopIndex: 4,
+      continuesCircle: false,
+      circleId: createId(start + index),
+      limitMin: 120,
+      stepCount: 5,
+      firstMinuteIndex: null,
+    });
+    const size = async (logs: readonly ITimeLog[], schemaVersion: number): Promise<number> => {
+      const adapter = new MemoryAdapter();
+      await adapter.putMany('timeLogs', logs);
+      return new TextEncoder().encode(JSON.stringify({ ...(await adapter.exportAll()), schemaVersion })).length;
+    };
+    const before = await size(legacyLogs, 4);
+    const after = await size(legacyLogs.map((log, index) => ({ ...log, steps: steps(index) })), SCHEMA_VERSION);
+    // Замер на этих данных — в описании pull request
+    expect(after - before).toBeLessThanOrEqual(2_000_000);
   });
 });
 
