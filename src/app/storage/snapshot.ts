@@ -83,6 +83,7 @@ const RULES: Record<TCollection, Record<string, TFieldRule>> = {
     durationMin: 'number',
     source: 'string',
     editedAt: 'string?',
+    steps: 'object?',
   },
   notes: {
     ...BASE,
@@ -98,6 +99,7 @@ const RULES: Record<TCollection, Record<string, TFieldRule>> = {
   meta: {
     ...BASE,
     onboarded: 'boolean',
+    timer: 'object?',
     settings: 'object',
     tips: 'object',
     milestonesShown: 'array',
@@ -202,6 +204,100 @@ const DEEP: Partial<Record<string, (value: unknown) => boolean>> = {
   'items.checkpointDay': (value) => value === null || value === undefined || (typeof value === 'number' && Number.isInteger(value) && value >= 1),
 };
 
+const isWhole = (value: unknown, min: number): value is number =>
+  typeof value === 'number' && Number.isInteger(value) && value >= min;
+
+/** Индекс шага: целое в пределах массива минут шагов. */
+const isStepIndex = (value: unknown, length: number): boolean => isWhole(value, 0) && value < length;
+
+const isBoolean = (value: unknown): boolean => typeof value === 'boolean';
+
+/** Правило поля сведений о шагах; `length` — длина массива минут шагов (`minutes` лога, `spentMs` таймера). */
+type TStepsRule = (value: unknown, length: number) => boolean;
+
+/** Сведения о шагах лога (ADR-007, «Миграция схемы 4 → 5»). Поле `firstMinuteIndex` обязано быть: null — ни один шаг не набрал 1 мин (Q-021). */
+const LOG_STEPS_RULES: Readonly<Record<string, TStepsRule>> = {
+  startIndex: isStepIndex,
+  stopIndex: isStepIndex,
+  stepCount: (value, length) => isWhole(value, 1) && value <= length,
+  limitMin: (value) => typeof value === 'number' && Number.isFinite(value) && value > 0,
+  continuesCircle: isBoolean,
+  circleId: (value) => typeof value === 'string' && value.length > 0,
+  firstMinuteIndex: (value, length) => value === null || isStepIndex(value, length),
+};
+
+/** Шаги идущей сессии (ADR-007, «Миграция схемы 4 → 5»). */
+const TIMER_STEPS_RULES: Readonly<Record<string, TStepsRule>> = {
+  activeIndex: isStepIndex,
+  startIndex: (value) => isWhole(value, 0),
+  stepCount: (value) => isWhole(value, 1),
+  planSignaled: (value) => Array.isArray(value) && value.every((entry) => isWhole(entry, 0)),
+  continuesCircle: isBoolean,
+  limitSignaled: isBoolean,
+  circleId: (value) => typeof value === 'string',
+  firstMinuteIndex: (value, length) => value === null || isStepIndex(value, length),
+};
+
+/** Первое поле, не прошедшее правило, как часть пути (`.startIndex`); null — все поля в порядке. */
+function stepsFieldError(steps: Readonly<Record<string, unknown>>, rules: Readonly<Record<string, TStepsRule>>, length: number): string | null {
+  const failed = Object.entries(rules).find(([field, rule]) => !rule(steps[field], length));
+  return failed ? `.${failed[0]}` : null;
+}
+
+/**
+ * Сведения о шагах лога: null или объект; шаги бывают только у лога таймера по топику.
+ * Сумма `minutes` с `durationMin` и `firstMinuteIndex` с `minutes` не сверяются: лог, исправленный в 1.5 после отката
+ * или правкой минут, законно расходится — домен выравнивает его сам (ADR-007, правила 4 и 8).
+ */
+function logStepsError(value: unknown, row: Readonly<Record<string, unknown>>): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!isRecord(value) || row['source'] !== 'timer' || typeof row['itemId'] !== 'string') {
+    return '';
+  }
+  const minutes = value['minutes'];
+  if (!Array.isArray(minutes) || minutes.length === 0 || !minutes.every((entry) => isWhole(entry, 0))) {
+    return '.minutes';
+  }
+  return stepsFieldError(value, LOG_STEPS_RULES, minutes.length);
+}
+
+/** Таймер: null или объект; его `steps` — null или шаги идущей сессии, `legacySchedule` — boolean или нет поля. */
+function timerError(value: unknown): string | null {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!isRecord(value)) {
+    return '';
+  }
+  if (value['legacySchedule'] !== undefined && !isBoolean(value['legacySchedule'])) {
+    return '.legacySchedule';
+  }
+  const steps = value['steps'];
+  if (steps === null || steps === undefined) {
+    return null;
+  }
+  if (!isRecord(steps)) {
+    return '.steps';
+  }
+  const spentMs = steps['spentMs'];
+  if (!Array.isArray(spentMs) || !spentMs.every((entry) => typeof entry === 'number' && Number.isFinite(entry) && entry >= 0)) {
+    return '.steps.spentMs';
+  }
+  const failed = stepsFieldError(steps, TIMER_STEPS_RULES, spentMs.length);
+  return failed === null ? null : `.steps${failed}`;
+}
+
+/**
+ * Вложенные структуры, у которых путь ошибки уточняется до поля внутри (`timeLogs[0].steps.minutes`).
+ * Возвращают null, если всё в порядке, иначе — часть пути после имени поля ('' — само поле).
+ */
+const NESTED: Partial<Record<string, (value: unknown, row: Readonly<Record<string, unknown>>) => string | null>> = {
+  'timeLogs.steps': logStepsError,
+  'meta.timer': timerError,
+};
+
 export type TSnapshotCheck =
   | { readonly ok: true; readonly snapshot: ISnapshot }
   | { readonly ok: false; readonly reason: 'parse' | 'schema'; readonly path: string };
@@ -267,14 +363,20 @@ export function checkSnapshot(text: string): TSnapshotCheck {
       }
       for (const [field, rule] of Object.entries(rules)) {
         const value = row[field];
-        const allowed = ENUMS[`${collection}.${field}`];
-        const deep = DEEP[`${collection}.${field}`];
+        const key = `${collection}.${field}`;
+        const allowed = ENUMS[key];
+        const deep = DEEP[key];
+        const path = `${collection}[${index}].${field}`;
         if (
           !checkField(value, rule) ||
           (allowed && typeof value === 'string' && !allowed.includes(value)) ||
           (deep && !deep(value))
         ) {
-          return { ok: false, reason: 'schema', path: `${collection}[${index}].${field}` };
+          return { ok: false, reason: 'schema', path };
+        }
+        const nested = NESTED[key]?.(value, row) ?? null;
+        if (nested !== null) {
+          return { ok: false, reason: 'schema', path: `${path}${nested}` };
         }
       }
     }

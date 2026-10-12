@@ -1,10 +1,66 @@
-import { describe, expect, it } from 'vitest';
+import { TestBed } from '@angular/core/testing';
+import { afterEach, describe, expect, it } from 'vitest';
 import { budgetFixture, itemFixture, logFixture, sectionFixture, topicFixture } from '../domain/test-fixtures';
-import { defaultMeta } from '../services/data.store';
-import type { IItem } from '../types';
+import { DataStore, defaultMeta } from '../services/data.store';
+import type { IItem, ILogSteps, IMeta, ITimeLog, ITimerState, ITimerSteps } from '../types';
 import { MemoryAdapter } from './memory.adapter';
 import { checkSnapshot } from './snapshot';
-import { SCHEMA_VERSION } from './storage-adapter';
+import { SCHEMA_VERSION, STORAGE_ADAPTER } from './storage-adapter';
+
+// Сведения о шагах по ADR-007 собраны здесь, без правки domain/test-fixtures.ts (ТД-15)
+const CIRCLE = '0192f5c4-6a1b-7c2d-8e3f-a1b2c3d4e5f6';
+const STARTED = '2026-01-05T10:00:00.000Z';
+
+/** Сессия «Сфера и куб» (20 / 10 / 60): 25 мин, шаг 1 — 20, шаг 2 — 5, остановка на шаге 2. */
+function logSteps(patch: Partial<ILogSteps> = {}): ILogSteps {
+  return {
+    minutes: [20, 5, 0],
+    startIndex: 0,
+    stopIndex: 1,
+    continuesCircle: false,
+    circleId: CIRCLE,
+    limitMin: 90,
+    stepCount: 3,
+    firstMinuteIndex: 0,
+    ...patch,
+  };
+}
+
+/** Идущая сессия: шаг 1 отдал 20 мин, активен шаг 2. */
+function timerSteps(patch: Partial<ITimerSteps> = {}): ITimerSteps {
+  return {
+    activeIndex: 1,
+    spentMs: [1_200_000, 0, 0],
+    startIndex: 0,
+    continuesCircle: false,
+    circleId: CIRCLE,
+    stepCount: 3,
+    firstMinuteIndex: 0,
+    planSignaled: [0],
+    limitSignaled: false,
+    ...patch,
+  };
+}
+
+function steppedLog(id: string, steps: ILogSteps | null = logSteps(), startedAt = STARTED): ITimeLog {
+  return { ...logFixture({ id, itemId: 'i1', type: 'practice', startedAt, minutes: 25 }), steps };
+}
+
+/** Таймер 1.5 «Сфера и куб»: длина 90, расписание после «+5 мин» на шаге 2. */
+function legacyTimer(): ITimerState {
+  return { itemId: 'i1', type: 'practice', startedAt: STARTED, pausedAt: null, pausedMs: 0, plannedMin: 90, stepMinutes: [20, 15, 60] };
+}
+
+function metaWith(timer: ITimerState | null): IMeta {
+  return { ...defaultMeta(), timer };
+}
+
+function snapshotFile(schemaVersion: number, data: object): string {
+  return JSON.stringify({ app: 'improva', kind: 'full', schemaVersion, exportedAt: '2026-01-05T10:25:00.000Z', data });
+}
+
+/** Очередь записи DataStore досылает изменения в хранилище за микрозадачи. */
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
   it('битый JSON и чужой файл отклоняются без изменений', () => {
@@ -136,5 +192,160 @@ describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
     expect(report).toMatchObject({ added: 1, updated: 1 });
     const data = await adapter.loadAll();
     expect(data.items.find((item) => item.id === 'i1')?.title).toBe('новое');
+  });
+});
+
+describe('схема 5: сведения о шагах сессии (ADR-007, FR-56, FR-66)', () => {
+  it('ТК-А20: файлы схем 1–5 проходят проверку и приводятся к текущей схеме', () => {
+    const { guide: _guide, routeRole: _role, courseKey: _key, courseHash: _hash, checkpointDay: _day, ...itemV1 } = itemFixture({ id: 'i1', topicId: 't1' });
+    const { courseKey: _key2, courseHash: _hash2, checkpointDay: _day2, ...itemV2 } = itemFixture({ id: 'i1', topicId: 't1' });
+    const { seasonalWeights: _seasonal, ...budgetV1 } = budgetFixture();
+    const { courseVersion: _version, dismissedCourseKeys: _dismissed, courseBannerDismissed: _banner, sessionDraft: _draft, ...metaV2 } = metaWith(legacyTimer());
+    const { sessionDraft: _draft3, ...metaV3 } = metaWith(legacyTimer());
+    const { stepMinutes: _schedule, ...timerV1 } = legacyTimer();
+    const log = logFixture({ id: 'l1', itemId: 'i1', type: 'practice', startedAt: STARTED, minutes: 25 });
+    const files = [
+      snapshotFile(1, { items: [itemV1], budgets: [budgetV1], meta: [{ ...metaV2, timer: timerV1 }], timeLogs: [log] }),
+      snapshotFile(2, { items: [itemV2], budgets: [budgetFixture()], meta: [metaV2], timeLogs: [log] }),
+      snapshotFile(3, { items: [itemFixture({ id: 'i1', topicId: 't1' })], meta: [metaV3], timeLogs: [log] }),
+      snapshotFile(4, { items: [itemFixture({ id: 'i1', topicId: 't1' })], meta: [metaWith(legacyTimer())], timeLogs: [log] }),
+      snapshotFile(5, {
+        items: [itemFixture({ id: 'i1', topicId: 't1' })],
+        meta: [metaWith({ ...legacyTimer(), stepMinutes: null, steps: timerSteps(), legacySchedule: false })],
+        timeLogs: [steppedLog('l1'), steppedLog('l2', logSteps({ firstMinuteIndex: null })), { ...log, id: 'l3', source: 'manual', steps: null }],
+      }),
+    ];
+    files.forEach((text, index) => {
+      const check = checkSnapshot(text);
+      expect(check.ok, `схема ${index + 1}`).toBe(true);
+      expect(check.ok && check.snapshot.schemaVersion).toBe(SCHEMA_VERSION);
+    });
+  });
+
+  it('ТК-А20: логи схемы 5 с шагом, первым набравшим 1 мин, и без него проходят без изменений (Q-021, Q-025)', () => {
+    const logs = [
+      steppedLog('first', logSteps({ firstMinuteIndex: 1, startIndex: 1, continuesCircle: true })),
+      // Ни один шаг не набрал 1 мин
+      steppedLog('none', logSteps({ minutes: [0, 1, 0], firstMinuteIndex: null })),
+      // Правка минут обнулила шаг, первым набравший 1 мин: правило 8 ADR-007 его не меняет
+      steppedLog('edited', logSteps({ minutes: [0, 25, 0], firstMinuteIndex: 0 })),
+      // Лог, исправленный в 1.5 после отката: сумма шагов ≠ минутам лога, домен выравнивает её сам (правило 4)
+      steppedLog('rollback', logSteps({ minutes: [20, 15, 0] })),
+      // Шаг, добавленный в ориентир во время сессии, удлиняет массив минут сверх stepCount
+      steppedLog('grown', logSteps({ minutes: [20, 0, 0, 5], stopIndex: 3 })),
+    ];
+    const check = checkSnapshot(snapshotFile(5, { timeLogs: logs }));
+    expect(check.ok).toBe(true);
+    expect(check.ok && check.snapshot.data.timeLogs).toEqual(logs);
+  });
+
+  it('ТК-А20: файл схемы 6 отклоняется', () => {
+    expect(checkSnapshot(snapshotFile(6, { timeLogs: [steppedLog('l1')] }))).toEqual({ ok: false, reason: 'schema', path: 'schemaVersion' });
+  });
+
+  const brokenLogs: readonly (readonly [string, object, string])[] = [
+    ['шаги строкой', { ...steppedLog('l'), steps: 'шаг 2' }, '.steps'],
+    ['шаги массивом', { ...steppedLog('l'), steps: [20, 5, 0] }, '.steps'],
+    ['шаги у ручного лога', { ...steppedLog('l'), source: 'manual' }, '.steps'],
+    ['шаги у лога без топика', { ...steppedLog('l'), itemId: null }, '.steps'],
+    ['пустые минуты', steppedLog('l', logSteps({ minutes: [] })), '.steps.minutes'],
+    ['дробная минута', steppedLog('l', logSteps({ minutes: [20, 4.5, 0] })), '.steps.minutes'],
+    ['отрицательная минута', steppedLog('l', logSteps({ minutes: [26, -1, 0] })), '.steps.minutes'],
+    ['шаг старта за пределами минут', steppedLog('l', logSteps({ startIndex: 3 })), '.steps.startIndex'],
+    ['отрицательный шаг остановки', steppedLog('l', logSteps({ stopIndex: -1 })), '.steps.stopIndex'],
+    ['число шагов 0', steppedLog('l', logSteps({ stepCount: 0 })), '.steps.stepCount'],
+    ['число шагов больше минут', steppedLog('l', logSteps({ stepCount: 4 })), '.steps.stepCount'],
+    ['лимит 0', steppedLog('l', logSteps({ limitMin: 0 })), '.steps.limitMin'],
+    ['продолжение круга строкой', { ...steppedLog('l'), steps: { ...logSteps(), continuesCircle: 'да' } }, '.steps.continuesCircle'],
+    ['пустой круг', steppedLog('l', logSteps({ circleId: '' })), '.steps.circleId'],
+    ['нет поля firstMinuteIndex', { ...steppedLog('l'), steps: { ...logSteps(), firstMinuteIndex: undefined } }, '.steps.firstMinuteIndex'],
+    ['firstMinuteIndex за пределами минут', steppedLog('l', logSteps({ firstMinuteIndex: 3 })), '.steps.firstMinuteIndex'],
+    ['дробный firstMinuteIndex', steppedLog('l', logSteps({ firstMinuteIndex: 0.5 })), '.steps.firstMinuteIndex'],
+  ];
+
+  const brokenTimers: readonly (readonly [string, object, string])[] = [
+    ['таймер строкой', { ...defaultMeta(), timer: 'идёт' }, '.timer'],
+    ['legacySchedule строкой', { ...defaultMeta(), timer: { ...legacyTimer(), legacySchedule: 'да' } }, '.timer.legacySchedule'],
+    ['legacySchedule null', { ...defaultMeta(), timer: { ...legacyTimer(), legacySchedule: null } }, '.timer.legacySchedule'],
+    ['шаги таймера строкой', { ...defaultMeta(), timer: { ...legacyTimer(), steps: 'шаг 2' } }, '.timer.steps'],
+    ['отрицательные мс шага', metaWith({ ...legacyTimer(), steps: timerSteps({ spentMs: [1_200_000, -1, 0] }) }), '.timer.steps.spentMs'],
+    ['мс шага не числом', { ...defaultMeta(), timer: { ...legacyTimer(), steps: { ...timerSteps(), spentMs: [1_200_000, null, 0] } } }, '.timer.steps.spentMs'],
+    ['активный шаг за пределами', metaWith({ ...legacyTimer(), steps: timerSteps({ activeIndex: 3 }) }), '.timer.steps.activeIndex'],
+    ['отрицательный шаг старта', metaWith({ ...legacyTimer(), steps: timerSteps({ startIndex: -1 }) }), '.timer.steps.startIndex'],
+    ['число шагов 0', metaWith({ ...legacyTimer(), steps: timerSteps({ stepCount: 0 }) }), '.timer.steps.stepCount'],
+    ['дробный сигнал шага', metaWith({ ...legacyTimer(), steps: timerSteps({ planSignaled: [0.5] }) }), '.timer.steps.planSignaled'],
+    ['нет поля continuesCircle', { ...defaultMeta(), timer: { ...legacyTimer(), steps: { ...timerSteps(), continuesCircle: undefined } } }, '.timer.steps.continuesCircle'],
+    ['сигнал лимита строкой', { ...defaultMeta(), timer: { ...legacyTimer(), steps: { ...timerSteps(), limitSignaled: 'нет' } } }, '.timer.steps.limitSignaled'],
+    ['круг числом', { ...defaultMeta(), timer: { ...legacyTimer(), steps: { ...timerSteps(), circleId: 7 } } }, '.timer.steps.circleId'],
+    ['нет поля firstMinuteIndex', { ...defaultMeta(), timer: { ...legacyTimer(), steps: { ...timerSteps(), firstMinuteIndex: undefined } } }, '.timer.steps.firstMinuteIndex'],
+    ['firstMinuteIndex за пределами', metaWith({ ...legacyTimer(), steps: timerSteps({ firstMinuteIndex: 3 }) }), '.timer.steps.firstMinuteIndex'],
+  ];
+
+  // Целый файл отклоняется по первому битому полю: годные записи из него тоже не применяются, данные приложения не меняются
+  for (const [name, row, suffix] of brokenLogs) {
+    it(`ТК-А20: битые сведения о шагах лога отклоняются с путём поля — ${name}`, () => {
+      expect(checkSnapshot(snapshotFile(5, { timeLogs: [steppedLog('ok'), row] }))).toEqual({ ok: false, reason: 'schema', path: `timeLogs[1]${suffix}` });
+    });
+  }
+
+  for (const [name, row, suffix] of brokenTimers) {
+    it(`ТК-А20: битые шаги идущего таймера отклоняются с путём поля — ${name}`, () => {
+      expect(checkSnapshot(snapshotFile(5, { timeLogs: [steppedLog('ok')], meta: [row] }))).toEqual({ ok: false, reason: 'schema', path: `meta[0]${suffix}` });
+    });
+  }
+});
+
+describe('удаление лога со сведениями о шагах (Q-022, НФТ «Хранение»)', () => {
+  afterEach(() => TestBed.resetTestingModule());
+
+  /** DataStore на хранилище в памяти: тот же путь записи, что у LogsService.remove и «Отменить». */
+  async function storeOn(adapter: MemoryAdapter): Promise<DataStore> {
+    TestBed.configureTestingModule({ providers: [{ provide: STORAGE_ADAPTER, useValue: adapter }] });
+    const store = TestBed.inject(DataStore);
+    await store.init();
+    await settle();
+    return store;
+  }
+
+  const removedSteps = logSteps({ circleId: '0192f5c4-dead-7000-8000-00000000c1c1', firstMinuteIndex: 1, startIndex: 1, continuesCircle: true });
+
+  it('ТК-А23: удаление сразу убирает лог вместе со шагами, без мягкого удаления; «Отменить» возвращает лог целиком', async () => {
+    const adapter = new MemoryAdapter();
+    await adapter.putMany('timeLogs', [steppedLog('kept'), steppedLog('removed', removedSteps, '2026-01-06T10:00:00.000Z')]);
+    const store = await storeOn(adapter);
+    const copy = store.data().timeLogs.find((log) => log.id === 'removed');
+    expect(copy?.steps).toEqual(removedSteps);
+
+    store.remove('timeLogs', ['removed']);
+    await settle();
+    const afterRemove = await adapter.loadAll();
+    expect(afterRemove.timeLogs.map((log) => log.id)).toEqual(['kept']);
+    expect(afterRemove.timeLogs.some((log) => log.deletedAt !== undefined)).toBe(false);
+    // Шагов без лога не остаётся: в полном экспорте нет ни лога, ни его круга
+    const exported = JSON.stringify(await adapter.exportAll());
+    expect(exported).not.toContain('"removed"');
+    expect(exported).not.toContain(removedSteps.circleId);
+
+    if (copy) {
+      store.upsert('timeLogs', copy);
+    }
+    await settle();
+    const restored = (await adapter.loadAll()).timeLogs.find((log) => log.id === 'removed');
+    expect(restored).toEqual(copy);
+    expect(restored?.steps?.firstMinuteIndex).toBe(1);
+  });
+
+  it('ТК-А23: «Отменить» до окончания записи удаления не оставляет лога без шагов', async () => {
+    const adapter = new MemoryAdapter();
+    await adapter.put('timeLogs', steppedLog('removed', removedSteps));
+    const store = await storeOn(adapter);
+    const copy = store.data().timeLogs.find((log) => log.id === 'removed');
+    store.remove('timeLogs', ['removed']);
+    if (copy) {
+      store.upsert('timeLogs', copy);
+    }
+    await settle();
+    expect((await adapter.loadAll()).timeLogs).toEqual([copy]);
+    expect(store.data().timeLogs).toEqual([copy]);
   });
 });
