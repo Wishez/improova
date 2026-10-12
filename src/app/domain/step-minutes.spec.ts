@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import type { ILogSteps, ITimerState, ITimerSteps } from '../types';
+import type { IGuideStep, ILogSteps, ITimerState, ITimerSteps } from '../types';
 import {
   MS_PER_MINUTE,
   editLogSteps,
   logStepMinutes,
   logStepsAtStop,
+  migrateLegacyTimer,
   redistributeStepMinutes,
   stepMsToMinutes,
   stepProgress,
@@ -58,6 +59,8 @@ function logSteps(patch: Partial<ILogSteps> = {}): ILogSteps {
     ...patch,
   };
 }
+
+const guideSteps = (minutes: readonly number[]): IGuideStep[] => minutes.map((value, index) => ({ title: `Шаг ${index + 1}`, minutes: value }));
 
 /** Детерминированный генератор для проверки свойств на многих входах. */
 function random(seed: number): () => number {
@@ -242,5 +245,93 @@ describe('«X из Y мин» и «+N сверх плана» (FR-53)', () => {
     expect(stepProgress({ circleMin: 12, sessionMs: 59_999, planMin: 20 }).doneMin).toBe(12);
     expect(stepProgress({ circleMin: 12, sessionMs: min(15), planMin: 20 })).toEqual({ doneMin: 27, planMin: 20, overMin: 7 });
     expect(stepProgress({ circleMin: 0, sessionMs: min(20), planMin: 20 }).overMin).toBe(0);
+  });
+});
+
+describe('перевод таймера 1.5 (FR-65, US-32)', () => {
+  /** Таймер 1.5 — без полей `steps` и `legacySchedule`, как его хранит 1.5 (ДТ-14). */
+  const legacy = (patch: Partial<ITimerState>): ITimerState => ({
+    itemId: 'item',
+    type: 'practice',
+    startedAt: '2026-10-12T10:00:00.000Z',
+    pausedAt: null,
+    pausedMs: 0,
+    plannedMin: 90,
+    stepMinutes: null,
+    ...patch,
+  });
+
+  it('ТК-А19: 20 / 10 / 60, лимит 90, 25-я минута — активен шаг 2, шаг 1 — 20 мин, шаг 2 — 5 мин', () => {
+    const migrated = migrateLegacyTimer({ timer: legacy({ plannedMin: 90 }), guideSteps: guideSteps([20, 10, 60]), elapsedMs: min(25), circleId: 'new' });
+    expect(migrated.legacySchedule).toBe(false);
+    expect(migrated.plannedMin).toBe(90);
+    expect(migrated.steps).toEqual({
+      activeIndex: 1,
+      spentMs: [min(20), 0, 0],
+      startIndex: 0,
+      continuesCircle: false,
+      circleId: 'new',
+      stepCount: 3,
+      firstMinuteIndex: 0,
+      planSignaled: [0],
+      limitSignaled: false,
+    });
+    expect(timerStepMs(migrated.steps ?? timerSteps(), min(25))).toEqual([min(20), min(5), 0]);
+  });
+
+  it('ТК-А19: расписание после «Предыдущий шаг» и «+5 мин» — шаг расписания 1.5, лимит прежний, сумма шагов равна часам', () => {
+    // 1.5: на 22-й минуте «Предыдущий шаг» (шаг 1 → 27 мин), на 23-й «+5 мин» (шаг 1 → 32 мин), длина 102
+    const timer15 = legacy({ plannedMin: 102, stepMinutes: [32, 10, 60] });
+    const early = migrateLegacyTimer({ timer: timer15, guideSteps: guideSteps([20, 10, 60]), elapsedMs: min(25), circleId: 'new' });
+    expect(early.steps?.activeIndex).toBe(0);
+    expect(early.steps?.planSignaled).toEqual([0]);
+    const late = migrateLegacyTimer({ timer: timer15, guideSteps: guideSteps([20, 10, 60]), elapsedMs: min(35), circleId: 'new' });
+    expect(late.plannedMin).toBe(102);
+    expect(late.steps?.activeIndex).toBe(1);
+    const ms = timerStepMs(late.steps ?? timerSteps(), min(35));
+    expect(ms).toEqual([min(32), min(3), 0]);
+    expect(total(ms)).toBe(min(35));
+  });
+
+  it('ТК-А19: 40 / 15 / 5, лимит 60, 62-я минута — шаг 3 с 7 мин, сигналы лимита и шагов уже прозвучали (Д-21)', () => {
+    const migrated = migrateLegacyTimer({ timer: legacy({ plannedMin: 60 }), guideSteps: guideSteps([40, 15, 5]), elapsedMs: min(62), circleId: 'new' });
+    expect(migrated.legacySchedule).toBe(false);
+    expect(migrated.steps?.activeIndex).toBe(2);
+    expect(timerStepMs(migrated.steps ?? timerSteps(), min(62))).toEqual([min(40), min(15), min(7)]);
+    expect(migrated.steps?.limitSignaled).toBe(true);
+    expect(migrated.steps?.planSignaled).toEqual([0, 1, 2]);
+  });
+
+  it('расписание другой длины, чем ориентир, не берётся — шаги по плановым минутам, как в 1.5', () => {
+    const migrated = migrateLegacyTimer({ timer: legacy({ stepMinutes: [5, 5] }), guideSteps: guideSteps([20, 10, 60]), elapsedMs: min(12), circleId: 'new' });
+    expect(migrated.steps?.activeIndex).toBe(0);
+  });
+
+  it('граница шага с допуском 1.5: время шагов до активного не больше прошедшего', () => {
+    const elapsedMs = min(20) - 5;
+    const migrated = migrateLegacyTimer({ timer: legacy({ plannedMin: 90 }), guideSteps: guideSteps([20, 10, 60]), elapsedMs, circleId: 'new' });
+    expect(migrated.steps?.activeIndex).toBe(1);
+    expect(total(timerStepMs(migrated.steps ?? timerSteps(), elapsedMs))).toBe(elapsedMs);
+  });
+
+  it('меньше минуты — шага первой минуты нет; топик без шагов ориентира — сессия без шагов', () => {
+    expect(migrateLegacyTimer({ timer: legacy({}), guideSteps: guideSteps([20, 10]), elapsedMs: 40_000, circleId: 'new' }).steps?.firstMinuteIndex).toBeNull();
+    const plain = migrateLegacyTimer({ timer: legacy({ plannedMin: 30 }), guideSteps: [], elapsedMs: min(10), circleId: 'new' });
+    expect(plain.steps).toBeNull();
+    expect(plain.legacySchedule).toBe(false);
+    expect(plain.plannedMin).toBe(30);
+  });
+
+  it('после перевода «Стоп» пишет новый круг с шага 1 и минутами по расписанию 1.5', () => {
+    const migrated = migrateLegacyTimer({ timer: legacy({ plannedMin: 90 }), guideSteps: guideSteps([20, 10, 60]), elapsedMs: min(25), circleId: 'new' });
+    expect(logStepsAtStop({ timer: migrated, elapsedMs: min(25), durationMin: 25 })).toMatchObject({
+      minutes: [20, 5, 0],
+      startIndex: 0,
+      stopIndex: 1,
+      continuesCircle: false,
+      circleId: 'new',
+      limitMin: 90,
+      stepCount: 3,
+    });
   });
 });

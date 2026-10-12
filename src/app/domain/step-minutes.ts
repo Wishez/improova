@@ -1,11 +1,14 @@
-import type { ILogSteps, ITimeLog, ITimerState, ITimerSteps } from '../types';
+import type { IGuideStep, ILogSteps, ITimeLog, ITimerState, ITimerSteps } from '../types';
 
 /**
- * Минуты шагов сессии (FR-53, FR-56, FR-64; ADR-007, правила 4, 6–8): время шагов идущей сессии,
- * шаг, первым набравший 1 мин, перевод мс в минуты при «Стоп» и правка минут лога по Д-7.
+ * Минуты шагов сессии (FR-53, FR-56, FR-64, FR-65; ADR-007, правила 4, 6–9): время шагов идущей сессии,
+ * шаг, первым набравший 1 мин, перевод мс в минуты при «Стоп», правка минут лога по Д-7 и перевод таймера 1.5.
  */
 
 export const MS_PER_MINUTE = 60_000;
+
+/** Допуск границы шага в расписании 1.5 — как у `phaseIndex` в 1.5: сотая доля секунды, в минутах. */
+const LEGACY_STEP_EPSILON_MIN = 1 / 6000;
 
 const sum = (values: readonly number[]): number => values.reduce((total, value) => total + value, 0);
 
@@ -162,4 +165,69 @@ export interface IStepProgress {
 export function stepProgress(params: { readonly circleMin: number; readonly sessionMs: number; readonly planMin: number }): IStepProgress {
   const doneMin = Math.floor((params.circleMin * MS_PER_MINUTE + Math.max(0, params.sessionMs)) / MS_PER_MINUTE);
   return { doneMin, planMin: params.planMin, overMin: Math.max(0, doneMin - params.planMin) };
+}
+
+/** Шаг расписания 1.5 на прошедшее время — с тем же допуском, что `phaseIndex` в 1.5; после конца расписания — последний. */
+function legacyActiveIndex(schedule: readonly number[], elapsedMs: number): number {
+  const elapsedMin = elapsedMs / MS_PER_MINUTE;
+  let passed = 0;
+  for (let index = 0; index < schedule.length; index += 1) {
+    passed += schedule[index] ?? 0;
+    if (elapsedMin < passed - LEGACY_STEP_EPSILON_MIN) {
+      return index;
+    }
+  }
+  return schedule.length - 1;
+}
+
+/**
+ * Перевод таймера, запущенного до 1.6 (FR-65; ADR-007, «Таймер, запущенный до 1.6»). Зовётся при первом открытии
+ * таймера с `legacySchedule: true`; результат пишется в `meta.timer` как есть, с `legacySchedule: false`.
+ * Расписание — `stepMinutes`, если его длина равна числу шагов ориентира, иначе плановые минуты шагов (как в 1.5).
+ * Шагам до активного — их минуты расписания, активному — остаток до `elapsed`, остальным — 0; лимит — `plannedMin`.
+ * Уже набранный план и прошедший лимит отмечены как прозвучавшие сигналы: после перевода они не повторяются (Д-21).
+ */
+export function migrateLegacyTimer(params: {
+  readonly timer: ITimerState;
+  /** Шаги ориентира топика сейчас; пусто — сессия без шагов. */
+  readonly guideSteps: readonly IGuideStep[];
+  readonly elapsedMs: number;
+  /** Новый круг: id создаёт сервис (`createId()`), домен остаётся чистым. */
+  readonly circleId: string;
+}): ITimerState {
+  const { timer, guideSteps, elapsedMs } = params;
+  if (guideSteps.length === 0) {
+    return { ...timer, steps: null, legacySchedule: false };
+  }
+  const schedule =
+    timer.stepMinutes && timer.stepMinutes.length === guideSteps.length ? timer.stepMinutes : guideSteps.map((step) => step.minutes);
+  const activeIndex = legacyActiveIndex(schedule, elapsedMs);
+  // Время шагов до активного не больше прошедшего: сумма шагов всегда равна часам сессии
+  let rest = elapsedMs;
+  const spentMs = schedule.map((minutes, index) => {
+    if (index >= activeIndex) {
+      return 0;
+    }
+    const ms = Math.min(minutes * MS_PER_MINUTE, rest);
+    rest -= ms;
+    return ms;
+  });
+  const stepMs = timerStepMs({ activeIndex, spentMs }, elapsedMs);
+  const firstMinute = stepMs.findIndex((ms) => ms >= MS_PER_MINUTE);
+  const planSignaled = guideSteps.flatMap((step, index) => ((stepMs[index] ?? 0) >= step.minutes * MS_PER_MINUTE ? [index] : []));
+  return {
+    ...timer,
+    legacySchedule: false,
+    steps: {
+      activeIndex,
+      spentMs,
+      startIndex: 0,
+      continuesCircle: false,
+      circleId: params.circleId,
+      stepCount: guideSteps.length,
+      firstMinuteIndex: firstMinute >= 0 ? firstMinute : null,
+      planSignaled,
+      limitSignaled: elapsedMs >= timer.plannedMin * MS_PER_MINUTE,
+    },
+  };
 }
