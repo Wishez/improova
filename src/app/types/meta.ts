@@ -1,5 +1,6 @@
 import type { IEntity } from './entity';
 import type { TSessionType } from './plan-block';
+import type { ITimerSteps } from './timer-steps';
 
 export interface ITimerState {
   readonly itemId: string | null;
@@ -7,9 +8,20 @@ export interface ITimerState {
   readonly startedAt: string;
   readonly pausedAt: string | null;
   readonly pausedMs: number;
+  /** Длина сессии при старте; у сессии с шагами ориентира с 1.6 — её лимит (FR-55, ADR-007). */
   readonly plannedMin: number;
-  /** Текущее расписание шагов ориентира в минутах после «Следующий шаг» / «+5 мин». */
+  /**
+   * Текущее расписание шагов ориентира в минутах после «Следующий шаг» / «+5 мин» (1.5).
+   * С 1.6 читается только при переводе таймера, запущенного до обновления (FR-65, ADR-007).
+   */
   readonly stepMinutes: readonly number[] | null;
+  /** Шаги ориентира идущей сессии (ADR-007); null или нет поля — сессия без шагов или таймер до 1.6 (`legacySchedule`). */
+  readonly steps?: ITimerSteps | null;
+  /**
+   * Таймер запущен до 1.6: шаги ещё идут по расписанию `stepMinutes` и переводятся на `steps`
+   * при первом открытии (FR-65, ADR-007). Нет поля — тоже таймер до 1.6.
+   */
+  readonly legacySchedule?: boolean;
 }
 
 /** Черновик конспекта сессии (FR-13, FR-35): переживает перезагрузку, пока итог не сохранён. */
