@@ -20,4 +20,9 @@ export interface ILogSteps {
   readonly limitMin: number;
   /** Число шагов ориентира при старте сессии (FR-63). */
   readonly stepCount: number;
+  /**
+   * Шаг, первым набравший 1 мин (Q-021): время шага в этой сессии первым достигло 60 000 мс.
+   * null — ни один шаг не набрал 1 мин. Правка минут лога его не меняет (FR-64, Q-025).
+   */
+  readonly firstMinuteIndex: number | null;
 }
