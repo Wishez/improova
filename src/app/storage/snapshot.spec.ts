@@ -1,10 +1,11 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, describe, expect, it } from 'vitest';
-import { budgetFixture, itemFixture, logFixture, sectionFixture, topicFixture } from '../domain/test-fixtures';
-import { DataStore, defaultMeta } from '../services/data.store';
-import type { IItem, ILogSteps, IMeta, ITimeLog, ITimerState, ITimerSteps } from '../types';
+import { buildProgramTree, minutesByDay, minutesBySection, minutesByType, planWeek, progressOfItems, spentByItem } from '../domain';
+import { budgetFixture, itemFixture, logFixture, programFixture, sectionFixture, topicFixture } from '../domain/test-fixtures';
+import { DataStore, defaultChallenge, defaultMeta } from '../services/data.store';
+import type { ICollections, IItem, ILogSteps, IMeta, ITimeLog, ITimerState, ITimerSteps } from '../types';
 import { MemoryAdapter } from './memory.adapter';
-import { checkSnapshot } from './snapshot';
+import { checkSnapshot, normalizeCollections } from './snapshot';
 import { SCHEMA_VERSION, STORAGE_ADAPTER } from './storage-adapter';
 
 // Сведения о шагах по ADR-007 собраны здесь, без правки domain/test-fixtures.ts (ТД-15)
@@ -59,8 +60,76 @@ function snapshotFile(schemaVersion: number, data: object): string {
   return JSON.stringify({ app: 'improva', kind: 'full', schemaVersion, exportedAt: '2026-01-05T10:25:00.000Z', data });
 }
 
+/** Файлы копии схем 1–5: у каждой версии — поля её релиза; таймер 1.5 идёт, у схемы 5 — шаги лога и таймера. */
+function schemaFiles(): readonly string[] {
+  const { guide: _guide, routeRole: _role, courseKey: _key, courseHash: _hash, checkpointDay: _day, ...itemV1 } = itemFixture({ id: 'i1', topicId: 't1' });
+  const { courseKey: _key2, courseHash: _hash2, checkpointDay: _day2, ...itemV2 } = itemFixture({ id: 'i1', topicId: 't1' });
+  const { seasonalWeights: _seasonal, ...budgetV1 } = budgetFixture();
+  const { courseVersion: _version, dismissedCourseKeys: _dismissed, courseBannerDismissed: _banner, sessionDraft: _draft, ...metaV2 } = metaWith(legacyTimer());
+  const { sessionDraft: _draft3, ...metaV3 } = metaWith(legacyTimer());
+  const { stepMinutes: _schedule, ...timerV1 } = legacyTimer();
+  const log = logFixture({ id: 'l1', itemId: 'i1', type: 'practice', startedAt: STARTED, minutes: 25 });
+  return [
+    snapshotFile(1, { items: [itemV1], budgets: [budgetV1], meta: [{ ...metaV2, timer: timerV1 }], timeLogs: [log] }),
+    snapshotFile(2, { items: [itemV2], budgets: [budgetFixture()], meta: [metaV2], timeLogs: [log] }),
+    snapshotFile(3, { items: [itemFixture({ id: 'i1', topicId: 't1' })], meta: [metaV3], timeLogs: [log] }),
+    snapshotFile(4, { items: [itemFixture({ id: 'i1', topicId: 't1' })], meta: [metaWith(legacyTimer())], timeLogs: [log] }),
+    snapshotFile(5, {
+      items: [itemFixture({ id: 'i1', topicId: 't1' })],
+      meta: [metaWith({ ...legacyTimer(), stepMinutes: null, steps: timerSteps(), legacySchedule: false })],
+      timeLogs: [steppedLog('l1'), steppedLog('l2', logSteps({ firstMinuteIndex: null })), { ...log, id: 'l3', source: 'manual', steps: null }],
+    }),
+  ];
+}
+
+/** Данные 1.5 (схема 4) в хранилище: программа и логи без шагов — таймер, ночная сессия до границы дня, ручной, творчество, повторение. */
+async function schema4Storage(timer: ITimerState | null): Promise<MemoryAdapter> {
+  const program = programFixture();
+  const adapter = new MemoryAdapter();
+  await adapter.putMany('sections', program.sections);
+  await adapter.putMany('topics', program.topics);
+  await adapter.putMany('items', program.items);
+  await adapter.put('budgets', budgetFixture());
+  await adapter.put('challenges', defaultChallenge(STARTED, '2026-01-05'));
+  await adapter.put('meta', metaWith(timer));
+  const logs: ITimeLog[] = [
+    logFixture({ id: 'l1', itemId: 'a0-0', type: 'study', startedAt: '2026-01-05T10:00:00.000Z', minutes: 45 }),
+    logFixture({ id: 'l2', itemId: 'a0-1', type: 'practice', startedAt: '2026-01-06T02:30:00.000Z', minutes: 90 }),
+    { ...logFixture({ id: 'l3', itemId: 'b1-1', type: 'practice', startedAt: '2026-01-06T12:00:00.000Z', minutes: 30 }), source: 'manual', editedAt: '2026-01-06T13:00:00.000Z' },
+    logFixture({ id: 'l4', itemId: null, type: 'creative', startedAt: '2026-01-07T18:00:00.000Z', minutes: 60 }),
+    logFixture({ id: 'l5', itemId: 'a0-0', type: 'review', startedAt: '2026-01-08T09:00:00.000Z', minutes: 15 }),
+  ];
+  await adapter.putMany('timeLogs', logs);
+  return adapter;
+}
+
+/** Минуты, которые считают «Статистика», прогресс и план (FR-65: до и после обновления совпадают). */
+function countedMinutes(data: ICollections): object {
+  const tree = buildProgramTree(data);
+  const spent = spentByItem(data.timeLogs);
+  return {
+    byDay: [...minutesByDay(data.timeLogs, 4)],
+    byType: minutesByType(data.timeLogs),
+    bySection: [...minutesBySection(tree, data.timeLogs)],
+    spent: [...spent],
+    progress: progressOfItems(data.items, spent),
+    plan: planWeek({ today: '2026-01-12', horizonDays: 7, budget: budgetFixture(), tree, resources: new Map(), logs: data.timeLogs, blocks: [], boundaryHour: 4 }),
+  };
+}
+
 /** Очередь записи DataStore досылает изменения в хранилище за микрозадачи. */
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
+
+/** DataStore на хранилище в памяти: тот же путь загрузки и записи, что в приложении. */
+async function storeOn(adapter: MemoryAdapter): Promise<DataStore> {
+  TestBed.configureTestingModule({ providers: [{ provide: STORAGE_ADAPTER, useValue: adapter }] });
+  const store = TestBed.inject(DataStore);
+  await store.init();
+  await settle();
+  return store;
+}
+
+afterEach(() => TestBed.resetTestingModule());
 
 describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
   it('битый JSON и чужой файл отклоняются без изменений', () => {
@@ -82,7 +151,9 @@ describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
     await source.init();
     await source.put('budgets', budgetFixture());
     await source.put('items', itemFixture({ id: 'i1', topicId: 't1' }));
-    await source.put('timeLogs', logFixture({ id: 'l1', itemId: 'i1', type: 'practice', startedAt: '2026-01-05T10:00:00.000Z', minutes: 45 }));
+    // Экспорт идёт из нормализованных данных в памяти: у лога без шагов поле steps: null (схема 5)
+    const log: ITimeLog = { ...logFixture({ id: 'l1', itemId: 'i1', type: 'practice', startedAt: '2026-01-05T10:00:00.000Z', minutes: 45 }), steps: null };
+    await source.put('timeLogs', log);
     const exported = await source.exportAll();
     const check = checkSnapshot(JSON.stringify(exported));
     expect(check.ok).toBe(true);
@@ -197,24 +268,7 @@ describe('импорт и экспорт (ТЗ 8.2, US-08)', () => {
 
 describe('схема 5: сведения о шагах сессии (ADR-007, FR-56, FR-66)', () => {
   it('ТК-А20: файлы схем 1–5 проходят проверку и приводятся к текущей схеме', () => {
-    const { guide: _guide, routeRole: _role, courseKey: _key, courseHash: _hash, checkpointDay: _day, ...itemV1 } = itemFixture({ id: 'i1', topicId: 't1' });
-    const { courseKey: _key2, courseHash: _hash2, checkpointDay: _day2, ...itemV2 } = itemFixture({ id: 'i1', topicId: 't1' });
-    const { seasonalWeights: _seasonal, ...budgetV1 } = budgetFixture();
-    const { courseVersion: _version, dismissedCourseKeys: _dismissed, courseBannerDismissed: _banner, sessionDraft: _draft, ...metaV2 } = metaWith(legacyTimer());
-    const { sessionDraft: _draft3, ...metaV3 } = metaWith(legacyTimer());
-    const { stepMinutes: _schedule, ...timerV1 } = legacyTimer();
-    const log = logFixture({ id: 'l1', itemId: 'i1', type: 'practice', startedAt: STARTED, minutes: 25 });
-    const files = [
-      snapshotFile(1, { items: [itemV1], budgets: [budgetV1], meta: [{ ...metaV2, timer: timerV1 }], timeLogs: [log] }),
-      snapshotFile(2, { items: [itemV2], budgets: [budgetFixture()], meta: [metaV2], timeLogs: [log] }),
-      snapshotFile(3, { items: [itemFixture({ id: 'i1', topicId: 't1' })], meta: [metaV3], timeLogs: [log] }),
-      snapshotFile(4, { items: [itemFixture({ id: 'i1', topicId: 't1' })], meta: [metaWith(legacyTimer())], timeLogs: [log] }),
-      snapshotFile(5, {
-        items: [itemFixture({ id: 'i1', topicId: 't1' })],
-        meta: [metaWith({ ...legacyTimer(), stepMinutes: null, steps: timerSteps(), legacySchedule: false })],
-        timeLogs: [steppedLog('l1'), steppedLog('l2', logSteps({ firstMinuteIndex: null })), { ...log, id: 'l3', source: 'manual', steps: null }],
-      }),
-    ];
+    const files = schemaFiles();
     files.forEach((text, index) => {
       const check = checkSnapshot(text);
       expect(check.ok, `схема ${index + 1}`).toBe(true);
@@ -295,18 +349,62 @@ describe('схема 5: сведения о шагах сессии (ADR-007, FR
   }
 });
 
-describe('удаление лога со сведениями о шагах (Q-022, НФТ «Хранение»)', () => {
-  afterEach(() => TestBed.resetTestingModule());
+describe('миграция схемы 4 → 5: данные 1.0–1.5 (FR-65, US-32)', () => {
+  const timers: readonly (readonly [string, ITimerState | null])[] = [
+    ['с идущим таймером 1.5', legacyTimer()],
+    ['без идущего таймера', null],
+  ];
 
-  /** DataStore на хранилище в памяти: тот же путь записи, что у LogsService.remove и «Отменить». */
-  async function storeOn(adapter: MemoryAdapter): Promise<DataStore> {
-    TestBed.configureTestingModule({ providers: [{ provide: STORAGE_ADAPTER, useValue: adapter }] });
-    const store = TestBed.inject(DataStore);
-    await store.init();
-    await settle();
-    return store;
+  for (const [name, timer] of timers) {
+    it(`ТК-А21: снимок схемы 4 ${name} нормализуется без потерь, минуты статистики, прогресса и плана те же`, async () => {
+      const stored = await (await schema4Storage(timer)).loadAll();
+      const normalized = normalizeCollections(stored);
+      // Только добавление полей: каждая запись — прежняя плюс умолчание, остальные коллекции не меняются
+      expect(normalized.timeLogs).toEqual(stored.timeLogs.map((log) => ({ ...log, steps: null })));
+      expect(normalized.meta).toEqual(stored.meta.map((meta) => ({ ...meta, timer: meta.timer ? { ...meta.timer, steps: null, legacySchedule: true } : null })));
+      expect({ ...normalized, timeLogs: stored.timeLogs, meta: stored.meta }).toEqual(stored);
+      expect(normalizeCollections(normalized)).toEqual(normalized);
+      // Таймер 1.5 после нормализации проходит проверку схемы 5
+      expect(checkSnapshot(snapshotFile(SCHEMA_VERSION, normalized)).ok).toBe(true);
+      expect(countedMinutes(normalized)).toEqual(countedMinutes(stored));
+    });
   }
 
+  it('ТК-А21: загрузка данных 1.5 нормализует их в памяти и не перезаписывает хранилище', async () => {
+    const adapter = await schema4Storage(legacyTimer());
+    const stored = await adapter.loadAll();
+    const store = await storeOn(adapter);
+    expect(store.data().timeLogs.map((log) => log.steps)).toEqual([null, null, null, null, null]);
+    // Перевод на шаги — при первом открытии таймера (FR-65), здесь только пометка
+    expect(store.meta().timer).toEqual({ ...legacyTimer(), steps: null, legacySchedule: true });
+    expect(await adapter.loadAll()).toEqual(stored);
+  });
+
+  it('ТК-А21: файл экспорта 1.5 с идущим таймером импортируется «Заменить» как данные схемы 5 (US-32, кр. 4)', async () => {
+    const source = await schema4Storage(legacyTimer());
+    const check = checkSnapshot(JSON.stringify({ ...(await source.exportAll()), schemaVersion: 4 }));
+    expect(check.ok && check.snapshot.schemaVersion).toBe(SCHEMA_VERSION);
+    const target = new MemoryAdapter();
+    if (check.ok) {
+      await target.importAll(check.snapshot, 'replace');
+    }
+    expect(await target.loadAll()).toEqual(normalizeCollections(await source.loadAll()));
+  });
+
+  it('ТК-А21: в файлах схем 1–4 логи «без шагов», таймер помечен legacySchedule; файл схемы 5 — как записан', () => {
+    const checks = schemaFiles().map((text) => checkSnapshot(text));
+    checks.slice(0, 4).forEach((check, index) => {
+      expect(check.ok && check.snapshot.data.timeLogs?.map((log) => log.steps), `схема ${index + 1}`).toEqual([null]);
+      expect(check.ok && check.snapshot.data.meta?.[0]?.timer, `схема ${index + 1}`).toMatchObject({ steps: null, legacySchedule: true, plannedMin: 90 });
+    });
+    const current = checks[4];
+    expect(current?.ok && current.snapshot.data.timeLogs?.map((log) => log.steps)).toEqual([logSteps(), logSteps({ firstMinuteIndex: null }), null]);
+    expect(current?.ok && current.snapshot.data.meta?.[0]?.timer).toMatchObject({ steps: timerSteps(), legacySchedule: false });
+  });
+});
+
+// Удаление и «Отменить» идут тем же путём, что LogsService.remove: DataStore.remove и upsert копии лога из памяти
+describe('удаление лога со сведениями о шагах (Q-022, НФТ «Хранение»)', () => {
   const removedSteps = logSteps({ circleId: '0192f5c4-dead-7000-8000-00000000c1c1', firstMinuteIndex: 1, startIndex: 1, continuesCircle: true });
 
   it('ТК-А23: удаление сразу убирает лог вместе со шагами, без мягкого удаления; «Отменить» возвращает лог целиком', async () => {

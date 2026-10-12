@@ -432,6 +432,10 @@ function normalizePartial(data: Partial<ICollections>): Partial<ICollections> {
     // Для данных v1 квартальные веса выключены: поведение планировщика не меняется
     next.budgets = data.budgets.map((budget) => ({ ...budget, seasonalWeights: budget.seasonalWeights ?? false }));
   }
+  if (data.timeLogs) {
+    // Логи до 1.6 и ручные — «без шагов»: места остановки не задают (FR-65). Внутрь steps нормализация не заходит (ADR-007)
+    next.timeLogs = data.timeLogs.map((log) => ({ ...log, steps: log.steps ?? null }));
+  }
   if (data.meta) {
     const legacy = data.meta.some((meta) => !('courseVersion' in meta));
     let courseVersion: number | null = null;
@@ -452,7 +456,15 @@ function normalizePartial(data: Partial<ICollections>): Partial<ICollections> {
     }
     next.meta = data.meta.map((meta) => ({
       ...meta,
-      timer: meta.timer ? { ...meta.timer, stepMinutes: meta.timer.stepMinutes ?? null } : null,
+      timer: meta.timer
+        ? {
+            ...meta.timer,
+            stepMinutes: meta.timer.stepMinutes ?? null,
+            steps: meta.timer.steps ?? null,
+            // Таймер без поля запущен до 1.6: на шаги его переводит таймер при первом открытии (FR-65), не нормализация
+            legacySchedule: meta.timer.legacySchedule ?? true,
+          }
+        : null,
       dayPlans: meta.dayPlans ?? {},
       courseVersion: 'courseVersion' in meta ? meta.courseVersion : courseVersion,
       dismissedCourseKeys: meta.dismissedCourseKeys ?? [],
@@ -467,7 +479,7 @@ export function normalizeCollections(data: ICollections): ICollections {
   return { ...data, ...normalizePartial(data) };
 }
 
-/** Цепочка миграций схемы; версия 3 — текущая. */
+/** Цепочка миграций схемы до текущей (SCHEMA_VERSION): только добавление полей с умолчанием. */
 export function migrate(snapshot: ISnapshot): ISnapshot {
   return { ...snapshot, schemaVersion: SCHEMA_VERSION, data: normalizePartial(snapshot.data) };
 }
