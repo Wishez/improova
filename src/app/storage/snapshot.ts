@@ -212,6 +212,12 @@ const isStepIndex = (value: unknown, length: number): boolean => isWhole(value, 
 
 const isBoolean = (value: unknown): boolean => typeof value === 'boolean';
 
+/** Число шагов ориентира при старте: целое от 1 до длины массива минут шагов — массивы только удлиняются (ADR-007). */
+const isStepCount = (value: unknown, length: number): boolean => isWhole(value, 1) && value <= length;
+
+/** Круг: непустая строка, общая у сессий одного круга (ADR-007, правило 3). */
+const isCircleId = (value: unknown): boolean => typeof value === 'string' && value.length > 0;
+
 /** Правило поля сведений о шагах; `length` — длина массива минут шагов (`minutes` лога, `spentMs` таймера). */
 type TStepsRule = (value: unknown, length: number) => boolean;
 
@@ -219,22 +225,26 @@ type TStepsRule = (value: unknown, length: number) => boolean;
 const LOG_STEPS_RULES: Readonly<Record<string, TStepsRule>> = {
   startIndex: isStepIndex,
   stopIndex: isStepIndex,
-  stepCount: (value, length) => isWhole(value, 1) && value <= length,
+  stepCount: isStepCount,
   limitMin: (value) => typeof value === 'number' && Number.isFinite(value) && value > 0,
   continuesCircle: isBoolean,
-  circleId: (value) => typeof value === 'string' && value.length > 0,
+  circleId: isCircleId,
   firstMinuteIndex: (value, length) => value === null || isStepIndex(value, length),
 };
 
-/** Шаги идущей сессии (ADR-007, «Миграция схемы 4 → 5»). */
+/**
+ * Шаги идущей сессии (ADR-007, «Миграция схемы 4 → 5»). `startIndex`, `stepCount` и `circleId` при «Стоп» переходят в лог
+ * без изменений, а `spentMs` даёт `minutes` той же длины, поэтому правила у них те же, что у лога: иначе принятый таймер
+ * после «Стоп» дал бы экспорт, который импорт отклоняет.
+ */
 const TIMER_STEPS_RULES: Readonly<Record<string, TStepsRule>> = {
   activeIndex: isStepIndex,
-  startIndex: (value) => isWhole(value, 0),
-  stepCount: (value) => isWhole(value, 1),
+  startIndex: isStepIndex,
+  stepCount: isStepCount,
   planSignaled: (value) => Array.isArray(value) && value.every((entry) => isWhole(entry, 0)),
   continuesCircle: isBoolean,
   limitSignaled: isBoolean,
-  circleId: (value) => typeof value === 'string',
+  circleId: isCircleId,
   firstMinuteIndex: (value, length) => value === null || isStepIndex(value, length),
 };
 
