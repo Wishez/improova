@@ -212,11 +212,17 @@ const isStepIndex = (value: unknown, length: number): boolean => isWhole(value, 
 
 const isBoolean = (value: unknown): boolean => typeof value === 'boolean';
 
-/** Число шагов ориентира при старте: целое от 1 до длины массива минут шагов — массивы только удлиняются (ADR-007). */
+/**
+ * Число шагов ориентира при старте: целое от 1 до длины массива минут шагов. `minutes` лога не короче `stepCount`,
+ * `spentMs` таймера — по инварианту длины (ADR-007, «Длина spentMs»).
+ */
 const isStepCount = (value: unknown, length: number): boolean => isWhole(value, 1) && value <= length;
 
 /** Круг: непустая строка, общая у сессий одного круга (ADR-007, правило 3). */
 const isCircleId = (value: unknown): boolean => typeof value === 'string' && value.length > 0;
+
+/** Лимит сессии с шагами — длина при старте (FR-55): `limitMin` лога и `plannedMin` таймера, который «Стоп» переносит в `limitMin`. */
+const isLimitMin = (value: unknown): boolean => typeof value === 'number' && Number.isFinite(value) && value > 0;
 
 /** Правило поля сведений о шагах; `length` — длина массива минут шагов (`minutes` лога, `spentMs` таймера). */
 type TStepsRule = (value: unknown, length: number) => boolean;
@@ -226,7 +232,7 @@ const LOG_STEPS_RULES: Readonly<Record<string, TStepsRule>> = {
   startIndex: isStepIndex,
   stopIndex: isStepIndex,
   stepCount: isStepCount,
-  limitMin: (value) => typeof value === 'number' && Number.isFinite(value) && value > 0,
+  limitMin: isLimitMin,
   continuesCircle: isBoolean,
   circleId: isCircleId,
   firstMinuteIndex: (value, length) => value === null || isStepIndex(value, length),
@@ -234,8 +240,10 @@ const LOG_STEPS_RULES: Readonly<Record<string, TStepsRule>> = {
 
 /**
  * Шаги идущей сессии (ADR-007, «Миграция схемы 4 → 5»). `startIndex`, `stepCount` и `circleId` при «Стоп» переходят в лог
- * без изменений, а `spentMs` даёт `minutes` той же длины, поэтому правила у них те же, что у лога: иначе принятый таймер
- * после «Стоп» дал бы экспорт, который импорт отклоняет.
+ * без изменений, а `spentMs` по инварианту длины (`ITimerSteps.spentMs`) даёт `minutes` той же длины, поэтому правила у них
+ * те же, что у лога: иначе принятый таймер после «Стоп» дал бы экспорт, который импорт отклоняет. Таймер с `spentMs` короче
+ * `stepCount` или `activeIndex + 1` нарушает инвариант — 1.6 такого не пишет, и импорт его отклоняет, хотя «Стоп»
+ * (`logStepsAtStop`) дополнил бы минуты нулями.
  */
 const TIMER_STEPS_RULES: Readonly<Record<string, TStepsRule>> = {
   activeIndex: isStepIndex,
@@ -273,7 +281,12 @@ function logStepsError(value: unknown, row: Readonly<Record<string, unknown>>): 
   return stepsFieldError(value, LOG_STEPS_RULES, minutes.length);
 }
 
-/** Таймер: null или объект; его `steps` — null или шаги идущей сессии, `legacySchedule` — boolean или нет поля. */
+/**
+ * Таймер: null или объект; его `steps` — null или шаги идущей сессии, `legacySchedule` — boolean или нет поля.
+ * У таймера с шагами `itemId` и `plannedMin` проверяются как у лога его «Стоп»: `itemId` переходит в лог, а лог со шагами
+ * бывает только по топику; `plannedMin` становится `limitMin`. У таймера без шагов они не проверяются: сессия без топика
+ * и таймер 1.5 законны.
+ */
 function timerError(value: unknown): string | null {
   if (value === null || value === undefined) {
     return null;
@@ -290,6 +303,12 @@ function timerError(value: unknown): string | null {
   }
   if (!isRecord(steps)) {
     return '.steps';
+  }
+  if (typeof value['itemId'] !== 'string') {
+    return '.itemId';
+  }
+  if (!isLimitMin(value['plannedMin'])) {
+    return '.plannedMin';
   }
   const spentMs = steps['spentMs'];
   if (!Array.isArray(spentMs) || !spentMs.every((entry) => typeof entry === 'number' && Number.isFinite(entry) && entry >= 0)) {

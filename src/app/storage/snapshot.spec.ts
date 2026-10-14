@@ -1,6 +1,17 @@
 import { TestBed } from '@angular/core/testing';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
-import { buildProgramTree, GUIDE_LIMITS, minutesByDay, minutesBySection, minutesByType, planWeek, progressOfItems, spentByItem } from '../domain';
+import {
+  buildProgramTree,
+  GUIDE_LIMITS,
+  logStepsAtStop,
+  migrateLegacyTimer,
+  minutesByDay,
+  minutesBySection,
+  minutesByType,
+  planWeek,
+  progressOfItems,
+  spentByItem,
+} from '../domain';
 import { budgetFixture, itemFixture, logFixture, programFixture, sectionFixture, topicFixture } from '../domain/test-fixtures';
 import { DataStore, defaultChallenge, defaultMeta } from '../services/data.store';
 import type { ICollections, IItem, ILogSteps, IMeta, ITimeLog, ITimerState, ITimerSteps } from '../types';
@@ -57,26 +68,21 @@ function metaWith(timer: ITimerState | null): IMeta {
   return { ...defaultMeta(), timer };
 }
 
+/** Идущий таймер 1.6 с шагами: топик, тип и лимит — как у таймера «Сфера и куб». */
+function steppedTimer(steps: ITimerSteps, patch: Partial<ITimerState> = {}): ITimerState {
+  return { ...legacyTimer(), stepMinutes: null, steps, legacySchedule: false, ...patch };
+}
+
 /**
- * Лог, который «Стоп» пишет из идущей сессии (ADR-007, ITimerSteps): startIndex, continuesCircle, circleId, stepCount
- * и записанный firstMinuteIndex переходят без изменений, мс шагов — в целые минуты той же длины, остановка — на активном шаге,
- * лимит — plannedMin. Раскладка минут по правилу 7 здесь не важна: импорт не сверяет сумму шагов с durationMin.
+ * Лог, который «Стоп» пишет из идущей сессии: сведения о шагах — доменный logStepsAtStop (ADR-007, правила 6 и 7),
+ * топик, тип и начало — из таймера. Активному шагу сверх spentMs идёт ещё 5 мин, засчитано round(elapsed / 60 000).
  */
-function stopLikeLog(timer: ITimerState, steps: ITimerSteps): ITimeLog {
-  const minutes = steps.spentMs.map((ms) => Math.round(ms / 60_000));
-  const durationMin = minutes.reduce((sum, value) => sum + value, 0);
+function stoppedLog(timer: ITimerState): ITimeLog {
+  const elapsedMs = (timer.steps?.spentMs ?? []).reduce((sum, ms) => sum + ms, 0) + 300_000;
+  const durationMin = Math.round(elapsedMs / 60_000);
   return {
     ...logFixture({ id: 'stopped', itemId: timer.itemId, type: timer.type, startedAt: timer.startedAt, minutes: durationMin }),
-    steps: {
-      minutes,
-      startIndex: steps.startIndex,
-      stopIndex: steps.activeIndex,
-      continuesCircle: steps.continuesCircle,
-      circleId: steps.circleId,
-      limitMin: timer.plannedMin,
-      stepCount: steps.stepCount,
-      firstMinuteIndex: steps.firstMinuteIndex,
-    },
+    steps: logStepsAtStop({ timer, elapsedMs, durationMin }),
   };
 }
 
@@ -346,6 +352,11 @@ describe('схема 5: сведения о шагах сессии (ADR-007, FR
     ['legacySchedule строкой', { ...defaultMeta(), timer: { ...legacyTimer(), legacySchedule: 'да' } }, '.timer.legacySchedule'],
     ['legacySchedule null', { ...defaultMeta(), timer: { ...legacyTimer(), legacySchedule: null } }, '.timer.legacySchedule'],
     ['шаги таймера строкой', { ...defaultMeta(), timer: { ...legacyTimer(), steps: 'шаг 2' } }, '.timer.steps'],
+    // «Стоп» переносит itemId таймера в лог, plannedMin — в limitMin: правила те же, что у лога со шагами
+    ['шаги у таймера без топика', metaWith(steppedTimer(timerSteps(), { itemId: null })), '.timer.itemId'],
+    ['лимит 0 у таймера с шагами', metaWith(steppedTimer(timerSteps(), { plannedMin: 0 })), '.timer.plannedMin'],
+    ['отрицательный лимит у таймера с шагами', metaWith(steppedTimer(timerSteps(), { plannedMin: -5 })), '.timer.plannedMin'],
+    ['лимит строкой у таймера с шагами', { ...defaultMeta(), timer: { ...steppedTimer(timerSteps()), plannedMin: '90' } }, '.timer.plannedMin'],
     ['отрицательные мс шага', metaWith({ ...legacyTimer(), steps: timerSteps({ spentMs: [1_200_000, -1, 0] }) }), '.timer.steps.spentMs'],
     ['мс шага не числом', { ...defaultMeta(), timer: { ...legacyTimer(), steps: { ...timerSteps(), spentMs: [1_200_000, null, 0] } } }, '.timer.steps.spentMs'],
     ['активный шаг за пределами', metaWith({ ...legacyTimer(), steps: timerSteps({ activeIndex: 3 }) }), '.timer.steps.activeIndex'],
@@ -375,26 +386,58 @@ describe('схема 5: сведения о шагах сессии (ADR-007, FR
     });
   }
 
-  it('ТК-А20: импорт судит таймер и лог, который из него запишет «Стоп», одинаково — принятый файл не даёт экспорт, который не импортируется', () => {
-    const candidates: readonly (readonly [string, ITimerSteps, boolean])[] = [
-      ['идущая сессия', timerSteps(), true],
-      ['старт и активный — последний шаг, круг продолжается', timerSteps({ spentMs: [0, 0, 0], startIndex: 2, activeIndex: 2, continuesCircle: true, firstMinuteIndex: null, planSignaled: [] }), true],
-      // Шаг, добавленный в ориентир во время сессии, удлиняет мс шагов сверх stepCount
-      ['мс шагов длиннее числа шагов', timerSteps({ spentMs: [1_200_000, 0, 0, 300_000], activeIndex: 3 }), true],
-      ['шаг старта за пределами мс шагов', timerSteps({ startIndex: 3 }), false],
-      ['число шагов больше мс шагов', timerSteps({ stepCount: 4 }), false],
-      ['пустой круг', timerSteps({ circleId: '' }), false],
+  it('ТК-А20: таймер с шагами, принятый импортом, после «Стоп» (logStepsAtStop) даёт лог, который импорт принимает: шаги, топик и лимит судятся одинаково', () => {
+    const migrated = migrateLegacyTimer({
+      timer: legacyTimer(),
+      guideSteps: [20, 10, 60].map((minutes, index) => ({ title: `Шаг ${index + 1}`, minutes })),
+      elapsedMs: 25 * 60_000,
+      circleId: CIRCLE,
+    });
+    // Название, таймер, принимает ли импорт таймер, принимает ли импорт лог его «Стоп»
+    const candidates: readonly (readonly [string, ITimerState, boolean, boolean])[] = [
+      ['идущая сессия', steppedTimer(timerSteps()), true, true],
+      // Старт пишет мс шагов нулями по числу шагов (ADR-007, «Длина spentMs»)
+      [
+        'старт с подсказкой «Продолжить с шага 3»',
+        steppedTimer(timerSteps({ spentMs: [0, 0, 0], startIndex: 2, activeIndex: 2, continuesCircle: true, firstMinuteIndex: null, planSignaled: [] })),
+        true,
+        true,
+      ],
+      ['один шаг', steppedTimer(timerSteps({ spentMs: [0], activeIndex: 0, stepCount: 1, firstMinuteIndex: null, planSignaled: [] })), true, true],
+      ['таймер 1.5 после перевода', migrated, true, true],
+      // Шаг, добавленный в ориентир во время сессии: массив дополнен до активного шага
+      ['мс шагов длиннее числа шагов', steppedTimer(timerSteps({ spentMs: [1_200_000, 0, 0, 300_000], activeIndex: 3 })), true, true],
+      // FR-63: из пяти шагов остались три, активный — последний оставшийся; массив не укорачивается
+      ['ориентир укоротили во время сессии', steppedTimer(timerSteps({ spentMs: [600_000, 600_000, 0, 0, 0], activeIndex: 2, stepCount: 5 })), true, true],
+      // Нарушают инвариант длины spentMs: 1.6 такой таймер не пишет, импорт его отклоняет. «Стоп» дополнил бы минуты нулями — лог законен
+      ['мс шагов короче числа шагов', steppedTimer(timerSteps({ spentMs: [0], activeIndex: 0, stepCount: 3, firstMinuteIndex: null, planSignaled: [] })), false, true],
+      ['число шагов больше мс шагов', steppedTimer(timerSteps({ stepCount: 4 })), false, true],
+      ['активный шаг за концом мс шагов', steppedTimer(timerSteps({ activeIndex: 3 })), false, true],
+      // Поля, которые «Стоп» переносит в лог: битое отклоняется и у таймера, и у лога
+      ['шаг старта за пределами мс шагов', steppedTimer(timerSteps({ startIndex: 3 })), false, false],
+      ['firstMinuteIndex за пределами мс шагов', steppedTimer(timerSteps({ firstMinuteIndex: 3 })), false, false],
+      ['пустой круг', steppedTimer(timerSteps({ circleId: '' })), false, false],
+      ['шаги у таймера без топика', steppedTimer(timerSteps(), { itemId: null }), false, false],
+      ['лимит 0', steppedTimer(timerSteps(), { plannedMin: 0 }), false, false],
     ];
     // Внутрь steps нормализация не заходит: таймер после импорта — тот же, что в файле (ТК-А21)
-    const verdicts = candidates.map(([name, steps]) => {
-      const timer: ITimerState = { ...legacyTimer(), stepMinutes: null, steps, legacySchedule: false };
-      return {
-        name,
-        timer: checkSnapshot(snapshotFile(5, { meta: [metaWith(timer)] })).ok,
-        log: checkSnapshot(snapshotFile(5, { timeLogs: [stopLikeLog(timer, steps)] })).ok,
-      };
-    });
-    expect(verdicts).toEqual(candidates.map(([name, , accepted]) => ({ name, timer: accepted, log: accepted })));
+    const verdicts = candidates.map(([name, timer]) => ({
+      name,
+      timer: checkSnapshot(snapshotFile(5, { meta: [metaWith(timer)] })).ok,
+      log: checkSnapshot(snapshotFile(5, { timeLogs: [stoppedLog(timer)] })).ok,
+    }));
+    expect(verdicts).toEqual(candidates.map(([name, , timer, log]) => ({ name, timer, log })));
+    // Нет таймера, который импорт принял, а лог его «Стоп» отклоняет
+    expect(verdicts.filter((verdict) => verdict.timer && !verdict.log)).toEqual([]);
+  });
+
+  it('ТК-А20: топик и лимит проверяются только у таймера с шагами — сессия без топика и таймер 1.5 без длины принимаются', () => {
+    const timers: readonly ITimerState[] = [
+      { ...legacyTimer(), itemId: null, type: 'creative', stepMinutes: null, steps: null, legacySchedule: false },
+      // 1.5: длина не больше 0 — фазы по умолчанию (buildPhases)
+      { ...legacyTimer(), plannedMin: 0 },
+    ];
+    expect(timers.map((timer) => checkSnapshot(snapshotFile(5, { meta: [metaWith(timer)] })).ok)).toEqual([true, true]);
   });
 });
 
