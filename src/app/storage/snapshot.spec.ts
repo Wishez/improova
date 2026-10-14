@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
-import { afterEach, describe, expect, it } from 'vitest';
-import { buildProgramTree, minutesByDay, minutesBySection, minutesByType, planWeek, progressOfItems, spentByItem } from '../domain';
+import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { buildProgramTree, GUIDE_LIMITS, minutesByDay, minutesBySection, minutesByType, planWeek, progressOfItems, spentByItem } from '../domain';
 import { budgetFixture, itemFixture, logFixture, programFixture, sectionFixture, topicFixture } from '../domain/test-fixtures';
 import { DataStore, defaultChallenge, defaultMeta } from '../services/data.store';
 import type { ICollections, IItem, ILogSteps, IMeta, ITimeLog, ITimerState, ITimerSteps } from '../types';
@@ -511,33 +511,50 @@ describe('экспорт и импорт сведений о шагах (FR-66, 
     expect((await target.loadAll()).meta[0]?.timer?.steps?.circleId).toBe(OTHER_CIRCLE);
   });
 
-  it('ТК-А24: полный экспорт 10 000 логов со сведениями о шагах растёт не больше чем на 2 000 000 байт (ДТ-6)', async () => {
-    const count = 10_000;
+  describe('рост полного экспорта (НФТ «Хранение», ДТ-6)', () => {
     const start = Date.parse('2025-03-01T10:00:00.000Z');
-    // Худший случай курса: 5 шагов (больше в ориентирах курса нет), двузначные минуты, трёхзначный лимит,
-    // firstMinuteIndex: null и circleId — UUIDv7, как createId. Остальные коллекции в обоих экспортах одинаковы
-    const legacyLogs = Array.from({ length: count }, (_, index) =>
-      logFixture({ id: createId(start + index), itemId: createId(start - index), type: 'practice', startedAt: new Date(start + index * 1_800_000).toISOString(), minutes: 100 }),
-    );
-    const steps = (index: number): ILogSteps => ({
-      minutes: [12, 24, 18, 30, 16],
-      startIndex: 0,
-      stopIndex: 4,
-      continuesCircle: false,
-      circleId: createId(start + index),
-      limitMin: 120,
-      stepCount: 5,
-      firstMinuteIndex: null,
-    });
+    let legacyLogs: readonly ITimeLog[] = [];
+    let before = 0;
+
     const size = async (logs: readonly ITimeLog[], schemaVersion: number): Promise<number> => {
       const adapter = new MemoryAdapter();
       await adapter.putMany('timeLogs', logs);
       return new TextEncoder().encode(JSON.stringify({ ...(await adapter.exportAll()), schemaVersion })).length;
     };
-    const before = await size(legacyLogs, 4);
-    const after = await size(legacyLogs.map((log, index) => ({ ...log, steps: steps(index) })), SCHEMA_VERSION);
-    // Замер на этих данных — в описании pull request
-    expect(after - before).toBeLessThanOrEqual(2_000_000);
+
+    // База роста — экспорт 1.5 тех же 10 000 логов без поля steps, один на все замеры. Остальные коллекции в экспортах одинаковы
+    beforeAll(async () => {
+      legacyLogs = Array.from({ length: 10_000 }, (_, index) =>
+        logFixture({ id: createId(start + index), itemId: createId(start - index), type: 'practice', startedAt: new Date(start + index * 1_800_000).toISOString(), minutes: 100 }),
+      );
+      before = await size(legacyLogs, 4);
+    });
+
+    /** Рост, байт UTF-8, если у каждого лога шаги с этими минутами; firstMinuteIndex: null и circleId — UUIDv7, как createId. */
+    const growth = async (minutes: readonly number[], limitMin: number): Promise<number> => {
+      const steps = (index: number): ILogSteps => ({
+        minutes: [...minutes],
+        startIndex: 0,
+        stopIndex: minutes.length - 1,
+        continuesCircle: false,
+        circleId: createId(start + index),
+        limitMin,
+        stepCount: minutes.length,
+        firstMinuteIndex: null,
+      });
+      return (await size(legacyLogs.map((log, index) => ({ ...log, steps: steps(index) })), SCHEMA_VERSION)) - before;
+    };
+
+    it(`ТК-А24: полный экспорт 10 000 логов с ориентирами до 5 шагов растёт не больше чем на 2 000 000 байт; ${GUIDE_LIMITS.stepsMax} шагов — справка без порога (Q-030)`, async () => {
+      // Порог проверяется на эталонном наборе Э-1 — ориентиры до 5 шагов (Q-030). Худший случай для него — у всех логов 5 шагов,
+      // двузначные минуты, трёхзначный лимит
+      const upToFive = await growth([12, 24, 18, 30, 16], 120);
+      expect(upToFive).toBeLessThanOrEqual(2_000_000);
+      // Справка: столько шагов допускает свой ориентир (GUIDE_LIMITS.stepsMax), порог к ним не применяется (Q-030)
+      const stepsMax = await growth(Array.from({ length: GUIDE_LIMITS.stepsMax }, (_, index) => 10 + index), 120);
+      console.info(`ТК-А24: рост экспорта на 10 000 логах — 5 шагов: ${upToFive} байт (порог 2 000 000); ${GUIDE_LIMITS.stepsMax} шагов: ${stepsMax} байт (справка, без порога)`);
+      expect(stepsMax).toBeGreaterThan(upToFive);
+    });
   });
 });
 
