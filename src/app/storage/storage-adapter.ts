@@ -40,8 +40,11 @@ export const COLLECTIONS: readonly TCollection[] = [
   'routeBlocks',
 ];
 
-/** 2 — ориентиры, маршрут мастеров и квартальные веса (1.2); 3 — версии курса, контрольные, доступ ресурсов (1.3); 4 — черновик конспекта (1.4). */
-export const SCHEMA_VERSION = 4;
+/**
+ * 2 — ориентиры, маршрут мастеров и квартальные веса (1.2); 3 — версии курса, контрольные, доступ ресурсов (1.3);
+ * 4 — черновик конспекта (1.4); 5 — шаги сессии (1.6, ADR-007).
+ */
+export const SCHEMA_VERSION = 5;
 
 export function emptyCollections(): ICollections {
   return {
