@@ -7,6 +7,7 @@ import {
   logStepsAtStop,
   migrateLegacyTimer,
   redistributeStepMinutes,
+  stepLimitMin,
   stepMsToMinutes,
   stepProgress,
   timerFirstMinuteIndex,
@@ -320,6 +321,53 @@ describe('перевод таймера 1.5 (FR-65, US-32)', () => {
     expect(plain.steps).toBeNull();
     expect(plain.legacySchedule).toBe(false);
     expect(plain.plannedMin).toBe(30);
+  });
+
+  it('ТК-А33: US-32, критерий 6 — длина ≤ 0 или не число: лимит равен сумме плановых минут шагов, таймер не сброшен (Q-035)', () => {
+    for (const plannedMin of [0, -5, Number.NaN, Number.POSITIVE_INFINITY]) {
+      const source = legacy({ plannedMin });
+      const migrated = migrateLegacyTimer({ timer: source, guideSteps: guideSteps([10, 20, 30]), elapsedMs: min(25), circleId: 'new' });
+      expect(migrated.plannedMin, `длина ${plannedMin}`).toBe(60);
+      // Сессия та же: начало и паузы не тронуты, время шагов равно часам
+      expect(migrated).toMatchObject({ startedAt: source.startedAt, pausedAt: null, pausedMs: 0, legacySchedule: false });
+      expect(migrated.steps?.activeIndex).toBe(1);
+      expect(timerStepMs(migrated.steps ?? timerSteps(), min(25))).toEqual([min(10), min(15), 0]);
+      expect(migrated.steps?.limitSignaled).toBe(false);
+    }
+  });
+
+  it('ТК-А33: контроль — годная длина 45 остаётся лимитом', () => {
+    const migrated = migrateLegacyTimer({ timer: legacy({ plannedMin: 45 }), guideSteps: guideSteps([10, 20, 30]), elapsedMs: min(25), circleId: 'new' });
+    expect(migrated.plannedMin).toBe(45);
+    expect(migrated.steps?.activeIndex).toBe(1);
+  });
+
+  it('ТК-А33: плановые минуты шагов в сумме 0 — лимит 90 мин (Q-035)', () => {
+    const migrated = migrateLegacyTimer({ timer: legacy({ plannedMin: 0 }), guideSteps: guideSteps([0, 0]), elapsedMs: min(25), circleId: 'new' });
+    expect(migrated.plannedMin).toBe(90);
+    expect(migrated.steps?.limitSignaled).toBe(false);
+  });
+
+  it('ТК-А33: правило лимита Q-035 — годная длина остаётся; null, строка, нет поля — как длина ≤ 0', () => {
+    const steps = guideSteps([10, 20, 30]);
+    expect(stepLimitMin({ savedMin: 45, guideSteps: steps })).toBe(45);
+    expect(stepLimitMin({ savedMin: 0.5, guideSteps: steps })).toBe(0.5);
+    expect(stepLimitMin({ savedMin: '60', guideSteps: steps })).toBe(60);
+    expect(stepLimitMin({ savedMin: '90', guideSteps: steps })).toBe(60);
+    expect(stepLimitMin({ savedMin: null, guideSteps: steps })).toBe(60);
+    expect(stepLimitMin({ savedMin: undefined, guideSteps: steps })).toBe(60);
+    expect(stepLimitMin({ savedMin: Number.POSITIVE_INFINITY, guideSteps: steps })).toBe(60);
+    expect(stepLimitMin({ savedMin: undefined, guideSteps: [] })).toBe(90);
+  });
+
+  it('ТК-А33: топик без шагов ориентира, длина 0 или NaN — сессия без шагов, лимит 90 мин, таймер не сброшен (Q-035, ТК-Q035.1)', () => {
+    for (const plannedMin of [0, Number.NaN]) {
+      const source = legacy({ plannedMin });
+      const plain = migrateLegacyTimer({ timer: source, guideSteps: [], elapsedMs: min(10), circleId: 'new' });
+      expect(plain.steps, `длина ${plannedMin}`).toBeNull();
+      expect(plain.plannedMin).toBe(90);
+      expect(plain).toMatchObject({ startedAt: source.startedAt, pausedAt: null, pausedMs: 0, legacySchedule: false });
+    }
   });
 
   it('после перевода «Стоп» пишет новый круг с шага 1 и минутами по расписанию 1.5', () => {

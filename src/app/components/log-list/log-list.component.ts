@@ -127,7 +127,8 @@ export class LogListComponent {
         return;
       }
     } else {
-      this.logsService.create({ itemId: this.itemId() ?? null, type: draft.type, startedAt, endedAt, source: 'manual' });
+      // Ручной лог — без шагов: место остановки он не задаёт (FR-57, FR-65)
+      this.logsService.create({ itemId: this.itemId() ?? null, type: draft.type, startedAt, endedAt, source: 'manual', steps: null });
     }
     this.cancel();
   }

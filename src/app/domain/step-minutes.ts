@@ -167,6 +167,23 @@ export function stepProgress(params: { readonly circleMin: number; readonly sess
   return { doneMin, planMin: params.planMin, overMin: Math.max(0, doneMin - params.planMin) };
 }
 
+/** Лимит, когда нет ни сохранённой длины, ни плановых минут шагов (Q-035). */
+const FALLBACK_LIMIT_MIN = 90;
+
+/**
+ * Лимит сессии с шагами по правилу Q-035 (FR-65): сохранённая длина, если это конечное число > 0; иначе сумма плановых
+ * минут шагов ориентира топика, а если и она 0 — 90 мин. Длина ≤ 0 или не число бывает только после импорта своего файла
+ * с нулевой оценкой топика. Поэтому лимит таймера с шагами всегда > 0, как требует импорт (ADR-007).
+ */
+export function stepLimitMin(params: { readonly savedMin: unknown; readonly guideSteps: readonly IGuideStep[] }): number {
+  const { savedMin } = params;
+  if (typeof savedMin === 'number' && Number.isFinite(savedMin) && savedMin > 0) {
+    return savedMin;
+  }
+  const planned = sum(params.guideSteps.map((step) => step.minutes));
+  return planned > 0 ? planned : FALLBACK_LIMIT_MIN;
+}
+
 /** Шаг расписания 1.5 на прошедшее время — с тем же допуском, что `phaseIndex` в 1.5; после конца расписания — последний. */
 function legacyActiveIndex(schedule: readonly number[], elapsedMs: number): number {
   const elapsedMin = elapsedMs / MS_PER_MINUTE;
@@ -184,8 +201,11 @@ function legacyActiveIndex(schedule: readonly number[], elapsedMs: number): numb
  * Перевод таймера, запущенного до 1.6 (FR-65; ADR-007, «Таймер, запущенный до 1.6»). Зовётся при первом открытии
  * таймера с `legacySchedule: true`; результат пишется в `meta.timer` как есть, с `legacySchedule: false`.
  * Расписание — `stepMinutes`, если его длина равна числу шагов ориентира, иначе плановые минуты шагов (как в 1.5).
- * Шагам до активного — их минуты расписания, активному — остаток до `elapsed`, остальным — 0; лимит — `plannedMin`.
+ * Шагам до активного — их минуты расписания, активному — остаток до `elapsed`, остальным — 0.
+ * Лимит — сохранённый `plannedMin`, а если он ≤ 0 или не число — по правилу Q-035 (`stepLimitMin`); таймер не сбрасывается.
  * Уже набранный план и прошедший лимит отмечены как прозвучавшие сигналы: после перевода они не повторяются (Д-21).
+ * Таймер топика без шагов ориентира переводится без шагов, лимит — по тому же правилу: сумма плановых минут шагов
+ * у такого топика 0, поэтому длина ≤ 0 или не число даёт 90 мин (Q-035, ТК-Q035.1).
  */
 export function migrateLegacyTimer(params: {
   readonly timer: ITimerState;
@@ -196,8 +216,9 @@ export function migrateLegacyTimer(params: {
   readonly circleId: string;
 }): ITimerState {
   const { timer, guideSteps, elapsedMs } = params;
+  const plannedMin = stepLimitMin({ savedMin: timer.plannedMin, guideSteps });
   if (guideSteps.length === 0) {
-    return { ...timer, steps: null, legacySchedule: false };
+    return { ...timer, plannedMin, steps: null, legacySchedule: false };
   }
   const schedule =
     timer.stepMinutes && timer.stepMinutes.length === guideSteps.length ? timer.stepMinutes : guideSteps.map((step) => step.minutes);
@@ -217,6 +238,7 @@ export function migrateLegacyTimer(params: {
   const planSignaled = guideSteps.flatMap((step, index) => ((stepMs[index] ?? 0) >= step.minutes * MS_PER_MINUTE ? [index] : []));
   return {
     ...timer,
+    plannedMin,
     legacySchedule: false,
     steps: {
       activeIndex,
@@ -227,7 +249,7 @@ export function migrateLegacyTimer(params: {
       stepCount: guideSteps.length,
       firstMinuteIndex: firstMinute >= 0 ? firstMinute : null,
       planSignaled,
-      limitSignaled: elapsedMs >= timer.plannedMin * MS_PER_MINUTE,
+      limitSignaled: elapsedMs >= plannedMin * MS_PER_MINUTE,
     },
   };
 }

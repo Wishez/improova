@@ -50,9 +50,10 @@ export class ForgottenDialogComponent {
     }
   }
 
+  /** «Засчитать»: лог и сведения о шагах пишутся вместе с остановкой таймера, разница с измеренным — по Д-7 (FR-56, FR-64). */
   protected count(): void {
     this.ui.forgottenOpen.set(false);
-    this.timer.stop(this.minutes());
+    void this.timer.stop(this.minutes());
   }
 
   protected discard(): void {
