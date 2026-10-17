@@ -353,6 +353,7 @@ export class TimerService {
       startedAt: startedAt.toISOString(),
       endedAt: endedAt.toISOString(),
       source: 'timer',
+      steps: null,
     });
     this.draft.attach(log.id);
     this.ui.summaryLogId.set(log.id);
