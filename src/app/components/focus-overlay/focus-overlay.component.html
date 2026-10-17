@@ -39,7 +39,6 @@
                 @if (current.hasPrevious) {
                   <button tuiButton type="button" size="xs" appearance="secondary" iconStart="@tui.skip-back" (click)="timer.prevStep()">Предыдущий шаг</button>
                 }
-                <button tuiButton type="button" size="xs" appearance="secondary" (click)="timer.extendStep()">+5 мин</button>
                 @if (current.next) {
                   <button tuiButton type="button" size="xs" appearance="secondary" iconEnd="@tui.skip-forward" (click)="timer.nextStep()">Следующий шаг</button>
                 }
