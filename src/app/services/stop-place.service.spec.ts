@@ -195,6 +195,13 @@ interface IContext {
   readonly routeBlocks: readonly IRouteBlock[];
 }
 
+/** Времена одного прогона замера ТК-А25, мс. */
+interface IMeasureRun {
+  readonly cold: number;
+  readonly tick: number;
+  readonly afterStop: number;
+}
+
 /** Очередь записи DataStore досылает изменения в хранилище за микрозадачи. */
 const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 0));
 
@@ -892,6 +899,10 @@ describe('обновление подсказки без перезагрузк�
 });
 
 describe('пересчёт подсказок (НФТ «Время отклика»)', () => {
+  // Лимит времени ТК-А25 — настройка прогона, не требование НФТ: пять прогонов идут 0,4–0,8 с, при CPU, занятом соседними
+  // процессами (8 занятых потоков на 2 ядрах), — до 1,6 с. 10 с — запас больше чем в 6 раз
+  const MEASURE_TIMEOUT_MS = 10_000;
+
   it('ТК-А25: тик часов, запись таймера и черновика конспекта подсказки не пересчитывают', async () => {
     const ctx = await setup({
       items: [topic({})],
@@ -928,7 +939,7 @@ describe('пересчёт подсказок (НФТ «Время отклик�
     expect(ctx.service.today()).not.toBe(today);
   });
 
-  it('ТК-А25: подсказки для всех блоков «Сегодня» и списка быстрого выбора на 3000 топиков и 10 000 логов — не дольше 100 мс', async () => {
+  it('ТК-А25: подсказки для всех блоков «Сегодня» и списка быстрого выбора на 3000 топиков и 10 000 логов — не дольше 100 мс', { timeout: MEASURE_TIMEOUT_MS }, async () => {
     // Эталонный объём Э-1 (ТД-12): 3000 топиков с ориентиром из 5 шагов, 10 000 логов таймера со сведениями о шагах за 300 дней
     const day = addDays(START, 300);
     const items = Array.from({ length: 3000 }, (_, index) =>
@@ -968,66 +979,86 @@ describe('пересчёт подсказок (НФТ «Время отклик�
       storedId: null,
       reviewIndex: null,
     }));
-    const todayPlan = signal<IDayPlan | null>({
-      date: day,
-      capacity: 540,
-      planned: 540,
-      logged: 0,
-      blocks,
-    });
-    const ctx = await setup({
-      items: [],
-      now: at(day, 12),
-      providers: [{ provide: PlanService, useValue: { today: todayPlan } }],
-    });
-    // Данные кладутся прямо в память: загрузка из хранилища к замеру не относится
-    ctx.store.data.update((data) => ({ ...data, items, timeLogs: logs }));
 
-    const measure = (): number => {
-      const started = performance.now();
+    /** Один прогон замера на свежем приложении: первый расчёт, тик часов и пересчёт после «Стоп». */
+    const run = async (): Promise<IMeasureRun> => {
+      TestBed.resetTestingModule();
+      const todayPlan = signal<IDayPlan | null>({
+        date: day,
+        capacity: 540,
+        planned: 540,
+        logged: 0,
+        blocks,
+      });
+      const ctx = await setup({
+        items: [],
+        now: at(day, 12),
+        providers: [{ provide: PlanService, useValue: { today: todayPlan } }],
+      });
+      // Данные кладутся прямо в память: загрузка из хранилища к замеру не относится
+      ctx.store.data.update((data) => ({ ...data, items, timeLogs: logs }));
+
+      const measure = (): number => {
+        const started = performance.now();
+        const cards = ctx.service.byItem();
+        const today = ctx.service.today();
+        const picker = items.map((item) => ctx.service.startOf({ itemId: item.id }));
+        const elapsed = performance.now() - started;
+        expect(cards.size).toBe(3000);
+        expect(today.size).toBe(blocks.length);
+        expect(picker.filter((entry) => entry?.hint.kind === 'continue').length).toBeGreaterThan(0);
+        return elapsed;
+      };
+      const cold = measure();
+
+      // Тик часов на эталонном объёме ничего не пересчитывает
       const cards = ctx.service.byItem();
       const today = ctx.service.today();
-      const picker = items.map((item) => ctx.service.startOf({ itemId: item.id }));
-      const elapsed = performance.now() - started;
-      expect(cards.size).toBe(3000);
-      expect(today.size).toBe(blocks.length);
-      expect(picker.filter((entry) => entry?.hint.kind === 'continue').length).toBeGreaterThan(0);
-      return elapsed;
+      ctx.clock.now.set(ctx.clock.now() + 15_000);
+      const tick = measure();
+      expect(ctx.service.byItem()).toBe(cards);
+      expect(ctx.service.today()).toBe(today);
+
+      // После «Стоп» — пересчёт тоже не дольше 100 мс
+      const meta: IMeta = { ...ctx.store.meta(), timer: null };
+      const stop = session({
+        id: 'stop',
+        itemId: 'i2',
+        type: 'practice',
+        startedAt: at(day, 11),
+        minutes: [3, 0, 0, 0, 0],
+        stopIndex: 0,
+        circleId: 'new',
+      });
+      await ctx.store.commit({
+        puts: [
+          { collection: 'timeLogs', entity: stop },
+          { collection: 'meta', entity: meta },
+        ],
+        removes: [],
+      });
+      const afterStop = measure();
+      expect(ctx.service.startOf({ itemId: 'i2' })?.hint).toEqual(hint('continue', 1, 3, 10));
+      return { cold, tick, afterStop };
     };
-    const cold = measure();
-    expect(cold).toBeLessThan(100);
 
-    // Тик часов на эталонном объёме ничего не пересчитывает
-    const cards = ctx.service.byItem();
-    const today = ctx.service.today();
-    ctx.clock.now.set(ctx.clock.now() + 15_000);
-    const tick = measure();
-    expect(ctx.service.byItem()).toBe(cards);
-    expect(ctx.service.today()).toBe(today);
-
-    // После «Стоп» — пересчёт тоже не дольше 100 мс
-    const meta: IMeta = { ...ctx.store.meta(), timer: null };
-    const stop = session({
-      id: 'stop',
-      itemId: 'i2',
-      type: 'practice',
-      startedAt: at(day, 11),
-      minutes: [3, 0, 0, 0, 0],
-      stopIndex: 0,
-      circleId: 'new',
-    });
-    await ctx.store.commit({
-      puts: [
-        { collection: 'timeLogs', entity: stop },
-        { collection: 'meta', entity: meta },
-      ],
-      removes: [],
-    });
-    const afterStop = measure();
-    expect(afterStop).toBeLessThan(100);
-    expect(ctx.service.startOf({ itemId: 'i2' })?.hint).toEqual(hint('continue', 1, 3, 10));
+    // Время — медиана пяти одинаковых прогонов, каждый на свежем приложении: единичный замер в общем прогоне тестов ловит
+    // паузы сборщика мусора и соседние процессы машины. Порог тот же, 100 мс, у первого расчёта и у пересчёта после «Стоп»
+    const runs: IMeasureRun[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      runs.push(await run());
+    }
+    const median = (pick: (entry: IMeasureRun) => number): number =>
+      runs.map(pick).sort((a, b) => a - b)[Math.floor(runs.length / 2)] ?? Number.POSITIVE_INFINITY;
+    const list = (pick: (entry: IMeasureRun) => number): string =>
+      runs.map((entry) => pick(entry).toFixed(1)).join(' / ');
+    const cold = median((entry) => entry.cold);
+    const afterStop = median((entry) => entry.afterStop);
     console.info(
-      `ТК-А25: подсказки на 3000 топиков и 10 000 логов — первый расчёт ${cold.toFixed(1)} мс, после тика ${tick.toFixed(1)} мс, после «Стоп» ${afterStop.toFixed(1)} мс (порог 100)`,
+      `ТК-А25: подсказки на 3000 топиков и 10 000 логов, медиана пяти прогонов — первый расчёт ${cold.toFixed(1)} мс (${list((entry) => entry.cold)}), ` +
+        `после тика ${median((entry) => entry.tick).toFixed(1)} мс, после «Стоп» ${afterStop.toFixed(1)} мс (${list((entry) => entry.afterStop)}) (порог 100)`,
     );
+    expect(cold).toBeLessThan(100);
+    expect(afterStop).toBeLessThan(100);
   });
 });
