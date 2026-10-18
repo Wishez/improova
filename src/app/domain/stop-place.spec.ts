@@ -407,13 +407,21 @@ describe('отклик подсказок (НФТ «Время отклика»)
       }),
     );
     const today = addDays(START, 300);
-    const started = performance.now();
-    const byItem = countedLogsByItem({ logs, items });
-    const starts = items.map((item) => stepStart({ item, type: item.kind, logs: byItem.get(item.id) ?? [], day: today, calendar: calendar() }));
-    const blocks = items.slice(0, 12).map((item) => stepStart({ item, type: 'review', logs: byItem.get(item.id) ?? [], day: today, calendar: calendar() }));
-    const elapsed = performance.now() - started;
-    expect(starts.filter((entry) => entry?.rule === 'continue').length).toBeGreaterThan(0);
-    expect(blocks.every((entry) => entry?.rule === 'review' || entry?.rule === 'checkpoint')).toBe(true);
-    expect(elapsed).toBeLessThan(100);
+    const measure = (): number => {
+      const started = performance.now();
+      const byItem = countedLogsByItem({ logs, items });
+      const starts = items.map((item) => stepStart({ item, type: item.kind, logs: byItem.get(item.id) ?? [], day: today, calendar: calendar() }));
+      const blocks = items.slice(0, 12).map((item) => stepStart({ item, type: 'review', logs: byItem.get(item.id) ?? [], day: today, calendar: calendar() }));
+      const elapsed = performance.now() - started;
+      expect(starts.filter((entry) => entry?.rule === 'continue').length).toBeGreaterThan(0);
+      expect(blocks.every((entry) => entry?.rule === 'review' || entry?.rule === 'checkpoint')).toBe(true);
+      return elapsed;
+    };
+    // Время расчёта — медиана пяти одинаковых прогонов: единичный замер в общем прогоне тестов ловит паузы сборщика мусора
+    // и соседние процессы машины. Порог тот же, 100 мс
+    const runs = Array.from({ length: 5 }, () => measure());
+    const median = [...runs].sort((a, b) => a - b)[Math.floor(runs.length / 2)] ?? Number.POSITIVE_INFINITY;
+    console.info(`ТК-А25 (домен): подсказки на 3000 топиков и 10 000 логов — медиана ${median.toFixed(1)} мс из прогонов ${runs.map((ms) => ms.toFixed(1)).join(' / ')} (порог 100)`);
+    expect(median).toBeLessThan(100);
   });
 });

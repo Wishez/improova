@@ -558,10 +558,15 @@ describe('экспорт и импорт сведений о шагах (FR-66, 
     const start = Date.parse('2025-03-01T10:00:00.000Z');
     let legacyLogs: readonly ITimeLog[] = [];
     let before = 0;
+    // Лимит времени замера — настройка прогона, не требование НФТ: тест идёт 0,5–1 с, при CPU, занятом соседними процессами
+    // (8 занятых потоков на 2 ядрах), — до 2,4 с, база в beforeAll — до 1,2 с. 15 с — запас больше чем в 6 раз
+    const EXPORT_TIMEOUT_MS = 15_000;
 
+    // Логи кладутся в пустое хранилище одним импортом «Заменить»: содержимое и порядок те же, что после putMany, но за один проход.
+    // putMany ищет каждую запись в коллекции (findIndex) — на 10 000 логов это 50 млн сравнений и 2–3 с на замер
     const size = async (logs: readonly ITimeLog[], schemaVersion: number): Promise<number> => {
       const adapter = new MemoryAdapter();
-      await adapter.putMany('timeLogs', logs);
+      await adapter.importAll({ app: 'improva', kind: 'full', schemaVersion: SCHEMA_VERSION, exportedAt: '', data: { timeLogs: [...logs] } }, 'replace');
       return new TextEncoder().encode(JSON.stringify({ ...(await adapter.exportAll()), schemaVersion })).length;
     };
 
@@ -571,7 +576,7 @@ describe('экспорт и импорт сведений о шагах (FR-66, 
         logFixture({ id: createId(start + index), itemId: createId(start - index), type: 'practice', startedAt: new Date(start + index * 1_800_000).toISOString(), minutes: 100 }),
       );
       before = await size(legacyLogs, 4);
-    });
+    }, EXPORT_TIMEOUT_MS);
 
     /** Рост, байт UTF-8, если у каждого лога шаги с этими минутами; firstMinuteIndex: null и circleId — UUIDv7, как createId. */
     const growth = async (minutes: readonly number[], limitMin: number): Promise<number> => {
@@ -588,7 +593,7 @@ describe('экспорт и импорт сведений о шагах (FR-66, 
       return (await size(legacyLogs.map((log, index) => ({ ...log, steps: steps(index) })), SCHEMA_VERSION)) - before;
     };
 
-    it(`ТК-А24: полный экспорт 10 000 логов с ориентирами до 5 шагов растёт не больше чем на 2 000 000 байт; ${GUIDE_LIMITS.stepsMax} шагов — справка без порога (Q-030)`, async () => {
+    it(`ТК-А24: полный экспорт 10 000 логов с ориентирами до 5 шагов растёт не больше чем на 2 000 000 байт; ${GUIDE_LIMITS.stepsMax} шагов — справка без порога (Q-030)`, { timeout: EXPORT_TIMEOUT_MS }, async () => {
       // Порог проверяется на эталонном наборе Э-1 — ориентиры до 5 шагов (Q-030). Худший случай для него — у всех логов 5 шагов,
       // двузначные минуты, трёхзначный лимит
       const upToFive = await growth([12, 24, 18, 30, 16], 120);
