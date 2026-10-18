@@ -162,6 +162,9 @@ async function stored(h: IHarness): Promise<{ readonly timer: ITimerState | null
   return { timer: meta?.timer ?? null, logs: data.timeLogs };
 }
 
+/** timer.stopFailed — знак в знак из вкладки «Тексты 1.6» (FR-56; НФТ «Надёжность»). */
+const STOP_FAILED_TEXT = 'Сессия не записана: хранилище не отвечает. Таймер не остановлен — нажми «Стоп» ещё раз.';
+
 const texts = (h: IHarness): string[] => h.shows.mock.calls.map(([params]) => params.text);
 const count = (h: IHarness, text: string): number => texts(h).filter((entry) => entry === text).length;
 const steps = (h: IHarness) => h.timer.state()?.steps ?? null;
@@ -306,6 +309,12 @@ describe('лимит сессии — длина при старте, шаги �
     const logId = await h.timer.stop();
     const log = (await stored(h)).logs.find((entry) => entry.id === logId);
     expect(log).toMatchObject({ durationMin: 60, steps: { limitMin: 45, minutes: [20, 10, 30], stopIndex: 2 } });
+  });
+
+  it('дробный лимит в «Время сессии вышло» округляется вниз, «мин» не отрывается от числа («Тексты 1.6», «Правила текстов»)', () => {
+    expect(sessionEndText(44.5)).toBe('Время сессии вышло: 44 мин');
+    expect(sessionEndText(45.99)).toBe('Время сессии вышло: 45 мин');
+    expect(sessionEndText(45)).toBe('Время сессии вышло: 45 мин');
   });
 
   it('сигнал «Стоп» тоста лимита останавливает сессию и пишет лог', async () => {
@@ -686,7 +695,7 @@ describe('запись сведений о шагах при «Стоп», «П�
     await at(min(5));
     const running = h.timer.state();
     expect(await h.timer.stop()).toBeNull();
-    expect(texts(h)).toContain('Не удалось записать сессию: хранилище не отвечает. Таймер идёт дальше.');
+    expect(texts(h)).toContain(STOP_FAILED_TEXT);
     expect(h.timer.state()).toEqual(running);
     expect(h.store.data().timeLogs).toEqual([]);
     expect((await stored(h)).timer?.steps).toMatchObject({ activeIndex: 1, spentMs: [min(3), 0, 0, 0] });
@@ -697,6 +706,21 @@ describe('запись сведений о шагах при «Стоп», «П�
     expect(timer).toBeNull();
     expect(logs).toHaveLength(1);
     expect(logs[0]).toMatchObject({ id: logId, durationMin: 6, steps: { minutes: [3, 3, 0, 0], stopIndex: 1 } });
+  });
+
+  it('хранилище отказало при «Стоп» на паузе — тост-ошибка timer.stopFailed на 10 с без кнопок, таймер стоит на паузе, как до «Стоп» (FR-56)', async () => {
+    const h = await bootWith([artists]);
+    h.timer.start({ itemId: 'artists', type: 'study', plannedMin: 45 });
+    await at(min(5));
+    h.timer.pause();
+    await at(min(7));
+    const paused = h.timer.state();
+    h.commits.mockRejectedValueOnce(new Error('Хранилище не отвечает'));
+    expect(await h.timer.stop()).toBeNull();
+    expect(h.shows).toHaveBeenCalledWith({ text: STOP_FAILED_TEXT, kind: 'error', durationMs: 10_000 });
+    expect(h.timer.state()).toEqual(paused);
+    expect(h.timer.paused()).toBe(true);
+    expect(h.store.data().timeLogs).toEqual([]);
   });
 
   it('повторный «Стоп» во время записи не пишет второй лог той же сессии', async () => {

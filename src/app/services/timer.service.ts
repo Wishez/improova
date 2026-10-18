@@ -92,16 +92,17 @@ export function stepPlanDoneText(params: { readonly title: string; readonly plan
   return `Время шага по плану вышло: ${shortStepTitle(params.title)} · ${params.planMin}${NBSP}мин`;
 }
 
-/** timer.sessionEnd (FR-55, Q-010): без предложения добавить время. */
+/** timer.sessionEnd (FR-55, Q-010): без предложения добавить время; минуты целые, с округлением вниз («Правила текстов»). */
 export function sessionEndText(limitMin: number): string {
-  return `Время сессии вышло: ${Math.round(limitMin)}${NBSP}мин`;
+  return `Время сессии вышло: ${Math.floor(limitMin)}${NBSP}мин`;
 }
 
 const TOO_SHORT_TEXT = 'Сессия короче минуты не записана.';
-const STOP_FAILED_TEXT = 'Не удалось записать сессию: хранилище не отвечает. Таймер идёт дальше.';
+/** timer.stopFailed (FR-56): таймер не остановлен — идёт или стоит на паузе, как до «Стоп». */
+const STOP_FAILED_TEXT = 'Сессия не записана: хранилище не отвечает. Таймер не остановлен — нажми «Стоп» ещё раз.';
 
 interface IStopResult {
-  /** logged — лог записан; short — сессия короче минуты; failed — хранилище отказало, таймер идёт; none — таймера нет. */
+  /** logged — лог записан; short — сессия короче минуты; failed — хранилище отказало, таймер не остановлен; none — таймера нет. */
   readonly status: 'logged' | 'short' | 'failed' | 'none';
   readonly logId: string | null;
 }
@@ -476,7 +477,7 @@ export class TimerService {
         removes: [],
       });
     } catch {
-      // Хранилище не приняло пакет: в памяти ничего не изменилось, таймер идёт со всеми шагами
+      // Хранилище не приняло пакет: в памяти ничего не изменилось, таймер со всеми шагами идёт или стоит на паузе, как до «Стоп»
       this.toasts.show({ text: STOP_FAILED_TEXT, kind: 'error', durationMs: 10_000 });
       return { status: 'failed', logId: null };
     }
