@@ -8,12 +8,32 @@ import { ToastService } from './toast.service';
 
 export const HORIZON_DAYS = 7;
 
-/** План на 7 дней вперёд: пересчитывается при любом изменении данных (FR-18…FR-20). */
+/** Списки равны, когда в них те же записи в том же порядке. */
+const sameList = <T>(a: readonly T[], b: readonly T[]): boolean =>
+  a.length === b.length && a.every((entry, index) => entry === b[index]);
+
+/** Веса разделов равны по значению. */
+const sameWeights = (a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): boolean =>
+  a.size === b.size && [...a].every(([id, weight]) => b.get(id) === weight);
+
+/**
+ * План на 7 дней вперёд (FR-18…FR-20): пересчитывается при изменении дня, настроек, бюджета, челленджа, программы,
+ * библиотеки, логов и блоков плана. Запись таймера в `meta` (смена шага, отметки сигналов) план не пересчитывает
+ * (НФТ «Время отклика»).
+ */
 @Injectable({ providedIn: 'root' })
 export class PlanService {
   private readonly store = inject(DataStore);
   private readonly toasts = inject(ToastService);
   private readonly course = inject(CourseService);
+
+  // Веса и маршрут курс считает из `store.data()`: новое значение на каждую запись, в том числе таймера.
+  // Дальше идут только настоящие изменения
+  private readonly sectionWeights = computed(() => this.course.sectionWeights(), {
+    equal: sameWeights,
+  });
+  private readonly routeBlocks = computed(() => this.course.routeBlocks(), { equal: sameList });
+  private readonly dayPlans = computed(() => this.store.meta().dayPlans);
 
   readonly plan = computed(() =>
     planWeek({
@@ -23,9 +43,9 @@ export class PlanService {
       tree: this.store.tree(),
       resources: this.store.resourcesById(),
       logs: this.store.logs(),
-      blocks: this.store.data().planBlocks,
+      blocks: this.store.planBlocks(),
       boundaryHour: this.store.settings().dayBoundaryHour,
-      sectionWeights: this.course.sectionWeights(),
+      sectionWeights: this.sectionWeights(),
       challengeStart: this.store.challenge().startDate,
     }),
   );
@@ -48,7 +68,7 @@ export class PlanService {
         remainingBySection.set(sectionId, (remainingBySection.get(sectionId) ?? 0) + minutes);
       }
     }
-    const sections = this.store.data().sections.filter((section) => !section.archived);
+    const sections = this.store.sections().filter((section) => !section.archived);
     const seasonal = this.store.budget().seasonalWeights;
     return buildCalendar({
       challenge: this.store.challenge(),
@@ -56,12 +76,12 @@ export class PlanService {
       today: this.store.today(),
       scale: plan.scale,
       factByDay,
-      dayPlans: this.store.meta().dayPlans,
+      dayPlans: this.dayPlans(),
       planDays: plan.days,
       sections,
       remainingBySection,
       weightsForQuarter: (quarter) => sectionWeightsFor({ sections, quarter, seasonal }),
-      routeBlocks: this.course.routeBlocks(),
+      routeBlocks: this.routeBlocks(),
       checkpoints: [...tree.itemById.values()]
         .filter((item) => item.checkpointDay !== null)
         .map((item) => ({ day: item.checkpointDay ?? 0, label: item.title, done: item.doneAt !== null })),
