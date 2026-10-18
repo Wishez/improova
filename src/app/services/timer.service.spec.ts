@@ -311,6 +311,12 @@ describe('лимит сессии — длина при старте, шаги �
     expect(log).toMatchObject({ durationMin: 60, steps: { limitMin: 45, minutes: [20, 10, 30], stopIndex: 2 } });
   });
 
+  it('дробный лимит в «Время сессии вышло» округляется вниз, «мин» не отрывается от числа («Тексты 1.6», «Правила текстов»)', () => {
+    expect(sessionEndText(44.5)).toBe('Время сессии вышло: 44 мин');
+    expect(sessionEndText(45.99)).toBe('Время сессии вышло: 45 мин');
+    expect(sessionEndText(45)).toBe('Время сессии вышло: 45 мин');
+  });
+
   it('сигнал «Стоп» тоста лимита останавливает сессию и пишет лог', async () => {
     const h = await bootWith([sphere]);
     h.timer.start({ itemId: 'sphere', type: 'practice', plannedMin: 45 });

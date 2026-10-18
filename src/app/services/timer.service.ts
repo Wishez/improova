@@ -92,9 +92,9 @@ export function stepPlanDoneText(params: { readonly title: string; readonly plan
   return `Время шага по плану вышло: ${shortStepTitle(params.title)} · ${params.planMin}${NBSP}мин`;
 }
 
-/** timer.sessionEnd (FR-55, Q-010): без предложения добавить время. */
+/** timer.sessionEnd (FR-55, Q-010): без предложения добавить время; минуты целые, с округлением вниз («Правила текстов»). */
 export function sessionEndText(limitMin: number): string {
-  return `Время сессии вышло: ${Math.round(limitMin)}${NBSP}мин`;
+  return `Время сессии вышло: ${Math.floor(limitMin)}${NBSP}мин`;
 }
 
 const TOO_SHORT_TEXT = 'Сессия короче минуты не записана.';
