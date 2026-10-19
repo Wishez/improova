@@ -5,6 +5,7 @@ import { SESSION_TYPE_LABEL } from '../../utils';
 import { GuideCardComponent } from '../guide-card/guide-card.component';
 import { LessonInfoComponent } from '../lesson-info/lesson-info.component';
 import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.component';
+import { SESSION_TEXTS } from './session-texts';
 
 /**
  * Режим фокуса: таймер, шаги ориентира, задание, конспект в markdown и ориентир рядом —
@@ -34,7 +35,13 @@ export class FocusOverlayComponent {
     const item = this.timer.item();
     return item ? this.course.taskOf(item) : '';
   });
+  protected readonly texts = SESSION_TEXTS;
   protected readonly over = computed(() => this.timer.totalMin() > 0 && this.timer.elapsed() >= this.timer.totalMin() * 60_000);
+  /** Строка под часами: лимит — длина при старте (FR-55); после лимита кнопки продления нет, только «Стоп» (Q-010). */
+  protected readonly limitText = computed(() => {
+    const limit = this.timer.totalMin();
+    return this.over() ? this.texts['focus.session.over'](limit) : this.texts['focus.session.limit'](limit);
+  });
   protected readonly step = computed(() => {
     const index = this.timer.phaseIndex();
     const phases = this.timer.phases();

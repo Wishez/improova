@@ -8,9 +8,7 @@
         </header>
         <div class="focus__clock num" [class.focus__clock_paused]="timer.paused()">{{ timer.clock() }}</div>
         @if (timer.totalMin() > 0) {
-          <p class="focus__total num" [class.focus__total_over]="over()">
-            {{ over() ? 'Время сессии вышло' : 'Сессия' }} · {{ round(timer.totalMin()) }} мин
-          </p>
+          <p class="focus__total num" [class.focus__total_over]="over()">{{ limitText() }}</p>
         }
         @if (task()) {
           <div class="focus__task">
@@ -72,7 +70,7 @@
           <button tuiButton type="button" size="m" appearance="secondary" [iconStart]="timer.paused() ? '@tui.play' : '@tui.pause'" (click)="timer.toggle()">
             {{ timer.paused() ? 'Продолжить' : 'Пауза' }}
           </button>
-          <button tuiButton type="button" size="m" iconStart="@tui.square" (click)="timer.stop()">Стоп</button>
+          <button tuiButton type="button" size="m" iconStart="@tui.square" (click)="timer.stop()">{{ texts['focus.stop'] }}</button>
         </div>
       </div>
       @if (item(); as current) {
