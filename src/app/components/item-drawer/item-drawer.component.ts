@@ -4,17 +4,18 @@ import { TuiButton, TuiCheckbox, TuiDialog } from '@taiga-ui/core';
 import { TuiSwitch } from '@taiga-ui/kit';
 import { estimateFromResource, isCountable, reviewState, topicBeforeAfter } from '../../domain';
 import { DayShortPipe, MarkdownPipe, MinutesPipe } from '../../pipes';
-import { DataStore, NotesService, PlanService, ProgramService, TimerService, UiStateService } from '../../services';
+import { DataStore, NotesService, PlanService, ProgramService, StopPlaceService, TimerService, UiStateService } from '../../services';
 import type { IResourceRef, TItemKind } from '../../types';
 import { RESOURCE_TYPE_LABEL } from '../../utils';
 import { GuideCardComponent } from '../guide-card/guide-card.component';
 import { LogListComponent } from '../log-list/log-list.component';
 import { NoteEditorComponent } from '../note-editor/note-editor.component';
+import { StartHintComponent } from '../start-hint/start-hint.component';
 
 /** Карточка топика: ориентир, пояснение, ресурсы, время, логи, заметки, старт и галочка (FR-08, FR-37). */
 @Component({
   selector: 'app-item-drawer',
-  imports: [FormsModule, TuiButton, TuiCheckbox, TuiSwitch, TuiDialog, MinutesPipe, DayShortPipe, MarkdownPipe, LogListComponent, NoteEditorComponent, GuideCardComponent],
+  imports: [FormsModule, TuiButton, TuiCheckbox, TuiSwitch, TuiDialog, MinutesPipe, DayShortPipe, MarkdownPipe, LogListComponent, NoteEditorComponent, GuideCardComponent, StartHintComponent],
   templateUrl: './item-drawer.component.html',
   styleUrl: './item-drawer.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,6 +25,7 @@ export class ItemDrawerComponent {
   private readonly program = inject(ProgramService);
   private readonly notesService = inject(NotesService);
   private readonly planner = inject(PlanService);
+  private readonly stopPlace = inject(StopPlaceService);
   protected readonly timer = inject(TimerService);
   protected readonly ui = inject(UiStateService);
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
@@ -47,6 +49,16 @@ export class ItemDrawerComponent {
     return estimate > 0 ? Math.min(1, this.spent() / estimate) : 0;
   });
   protected readonly remaining = computed(() => this.planner.plan().remainingByItem.get(this.item()?.id ?? '') ?? 0);
+  /** Сессия этого топика идёт: кнопка «Идёт сессия», подсказки до старта нет. */
+  protected readonly running = computed(() => {
+    const id = this.item()?.id;
+    return id !== undefined && this.timer.state()?.itemId === id;
+  });
+  /** Подсказка карточки — для сессии вида топика (FR-58): с этого шага начнёт «Старт» карточки. */
+  protected readonly startHint = computed(() => {
+    const id = this.item()?.id;
+    return id === undefined || this.running() ? null : (this.stopPlace.byItem().get(id)?.hint ?? null);
+  });
   protected readonly countable = computed(() => {
     const item = this.item();
     return item !== null && isCountable(item);

@@ -14,5 +14,6 @@ export * from './log-list/log-list.component';
 export * from './markdown-editor/markdown-editor.component';
 export * from './mini-timer/mini-timer.component';
 export * from './note-editor/note-editor.component';
+export * from './start-hint/start-hint.component';
 export * from './technique-card/technique-card.component';
 export * from './toast-host/toast-host.component';

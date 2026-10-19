@@ -1,19 +1,22 @@
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal } from '@angular/core';
 import { TuiDialog } from '@taiga-ui/core';
 import type { IItem, TSessionType } from '../../types';
-import { DataStore, PlanService, TimerService, UiStateService } from '../../services';
+import { DataStore, PlanService, StopPlaceService, TimerService, UiStateService, type IStartHint } from '../../services';
+import { StartHintComponent } from '../start-hint/start-hint.component';
 
 interface IPickOption {
   readonly item: IItem | null;
   readonly title: string;
   readonly meta: string;
   readonly type: TSessionType;
+  /** Подсказка до старта для сессии вида топика (FR-58); null — подсказки нет. */
+  readonly hint: IStartHint | null;
 }
 
-/** Выбор топика для сессии вне плана (today.restDay.cta, stats.empty.cta). */
+/** Выбор топика для сессии вне плана (today.restDay.cta, stats.empty.cta): старт без вопросов с подсказкой FR-58. */
 @Component({
   selector: 'app-session-picker',
-  imports: [TuiDialog],
+  imports: [TuiDialog, StartHintComponent],
   template: `
     <ng-template
       [tuiDialog]="ui.pickerOpen() !== null"
@@ -24,14 +27,17 @@ interface IPickOption {
         <input class="input" type="search" placeholder="Найти топик" aria-label="Найти топик" [value]="query()" (input)="onQuery($event)" (keydown.enter)="startFirst()" />
         <ul class="dlg__list" role="listbox" aria-label="Топики">
           @for (option of options(); track option.item?.id ?? option.title) {
-            <li>
+            <li role="none">
               <button type="button" class="dlg__option" role="option" [attr.aria-selected]="false" (click)="start(option)">
-                <span>{{ option.title }}</span>
+                <span class="dlg__optionMain">
+                  <span>{{ option.title }}</span>
+                  <app-start-hint class="dlg__optionHint" [hint]="option.hint" />
+                </span>
                 <span class="dlg__optionMeta">{{ option.meta }}</span>
               </button>
             </li>
           } @empty {
-            <li class="dlg__group">По запросу «{{ query() }}» топиков нет</li>
+            <li role="none" class="dlg__group">По запросу «{{ query() }}» топиков нет</li>
           }
         </ul>
       </div>
@@ -44,14 +50,19 @@ export class SessionPickerComponent {
   private readonly store = inject(DataStore);
   private readonly plan = inject(PlanService);
   private readonly timer = inject(TimerService);
+  private readonly stopPlace = inject(StopPlaceService);
   protected readonly ui = inject(UiStateService);
   protected readonly query = signal('');
+  /** Топик идущей сессии: подсказка показывается до старта, у идущей сессии её нет. */
+  private readonly runningItemId = computed(() => this.timer.state()?.itemId ?? null);
 
   protected readonly options = computed<IPickOption[]>(() => {
     const tree = this.store.tree();
     const needle = this.query().trim().toLowerCase();
     const planned = new Set(this.plan.plan().days.flatMap((day) => day.blocks.map((block) => block.itemId)));
-    const creative: IPickOption = { item: null, title: 'Свободное творчество', meta: 'без топика', type: 'creative' };
+    const starts = this.stopPlace.byItem();
+    const running = this.runningItemId();
+    const creative: IPickOption = { item: null, title: 'Свободное творчество', meta: 'без топика', type: 'creative', hint: null };
     const items: IPickOption[] = [...tree.itemById.values()]
       .filter((item) => item.doneAt === null || item.recurrenceWeeks !== null)
       .filter((item) => needle === '' || item.title.toLowerCase().includes(needle))
@@ -60,7 +71,8 @@ export class SessionPickerComponent {
       .map((item) => {
         const topic = tree.topicById.get(item.topicId);
         const section = topic ? tree.sectionById.get(topic.sectionId) : undefined;
-        return { item, title: item.title, meta: `${section?.title ?? ''} · ${topic?.title ?? ''}`, type: item.kind };
+        const hint = item.id === running ? null : (starts.get(item.id)?.hint ?? null);
+        return { item, title: item.title, meta: `${section?.title ?? ''} · ${topic?.title ?? ''}`, type: item.kind, hint };
       });
     return needle === '' || 'свободное творчество'.includes(needle) ? [creative, ...items] : items;
   });

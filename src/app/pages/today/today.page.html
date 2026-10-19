@@ -50,6 +50,7 @@
           <button type="button" class="block__main" (click)="open(block.itemId)">
             <span class="block__title">{{ titleOf(block) }}</span>
             <span class="block__meta">{{ block.type === 'creative' ? 'Без топика' : sectionOf(block).title }} · {{ typeLabel[block.type] }}{{ block.pinned ? ' · закреплён' : '' }}</span>
+            <app-start-hint class="block__hint" [id]="'startHint-' + block.key" [hint]="startHints().get(block.key)" />
           </button>
           <span class="block__min num">{{ block.plannedMin }} мин</span>
           <div class="block__actions">
@@ -66,6 +67,7 @@
             [appearance]="first ? 'primary' : 'secondary'"
             iconStart="@tui.play"
             class="block__start"
+            [attr.aria-describedby]="'startHint-' + block.key"
             [disabled]="timer.running()"
             (click)="start(block)"
           >

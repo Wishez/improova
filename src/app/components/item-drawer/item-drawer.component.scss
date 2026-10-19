@@ -38,8 +38,17 @@
   @apply hover:border-border focus:border-accent focus:outline-none;
 }
 
+.drawer__start {
+  @apply flex flex-col gap-2;
+}
+
 .drawer__actions {
   @apply flex flex-wrap items-center gap-4;
+}
+
+/* Подсказка не обрезается: переносится только после « · » */
+.drawer__hint {
+  @apply text-body;
 }
 
 .drawer__done,

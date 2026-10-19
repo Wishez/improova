@@ -101,6 +101,11 @@
   @apply truncate text-meta text-text-3;
 }
 
+/* Подсказка не обрезается: переносится только после « · » (неразрывные пробелы внутри частей) */
+.block__hint {
+  @apply mt-0.5;
+}
+
 .block__min {
   @apply shrink-0 text-body text-text-2;
 }
