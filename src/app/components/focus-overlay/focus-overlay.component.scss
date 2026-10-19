@@ -58,12 +58,46 @@
   @apply text-meta text-text-3;
 }
 
+/* Шаги ориентира в сессии (FR-53): у каждого накопленное за круг; на узком экране числа уходят на вторую строку */
+.steps {
+  @apply m-0 flex list-none flex-col gap-2 p-0;
+}
+
+.stepItem {
+  @apply flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-control border border-border p-3 text-body text-text-1 transition-colors duration-(--duration-base);
+}
+
+.stepItem_active {
+  @apply border-accent bg-surface-2;
+}
+
+.stepItem__n {
+  @apply text-meta font-semibold text-text-3;
+}
+
+.stepItem__title {
+  @apply min-w-0 flex-1 basis-48 font-semibold;
+}
+
+.stepItem__progress {
+  @apply ml-auto text-meta text-text-2;
+}
+
+/* Переработка написана текстом «+N сверх плана», цвет только дополняет */
+.stepItem__progress_over {
+  @apply text-warning;
+}
+
 .stepBar {
   @apply flex flex-wrap items-center justify-between gap-2 text-meta text-text-2;
 }
 
+.stepBar__text {
+  @apply min-w-0;
+}
+
 .stepBar__actions {
-  @apply flex gap-2;
+  @apply flex flex-wrap gap-2;
 }
 
 .focus__actions {

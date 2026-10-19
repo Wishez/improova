@@ -16,33 +16,36 @@
             <span>{{ task() }}</span>
           </div>
         }
-        @if (timer.phaseIndex() >= 0) {
+        @if (bar(); as current) {
+          <ol class="steps">
+            @for (step of timer.stepViews(); track step.index) {
+              <li class="stepItem" [class.stepItem_active]="step.active">
+                <span class="stepItem__n num">{{ step.index + 1 }}</span>
+                <span class="stepItem__title">{{ step.title }}</span>
+                <span class="stepItem__progress num" [class.stepItem__progress_over]="step.overMin > 0">{{ progress(step) }}</span>
+              </li>
+            }
+          </ol>
+          <div class="stepBar">
+            <span class="stepBar__text">{{ current.next ? texts['focus.stepBar.next'](current.next.title) : texts['focus.stepBar.last'] }}</span>
+            <div class="stepBar__actions">
+              @if (current.prev) {
+                <button tuiButton type="button" size="xs" appearance="secondary" iconStart="@tui.skip-back" (click)="timer.prevStep()">Предыдущий шаг</button>
+              }
+              @if (current.next) {
+                <button tuiButton type="button" size="xs" appearance="secondary" iconEnd="@tui.skip-forward" (click)="timer.nextStep()">Следующий шаг</button>
+              }
+            </div>
+          </div>
+        } @else if (timer.phaseIndex() >= 0) {
           <ol class="phases">
             @for (phase of timer.phases(); track $index; let index = $index) {
               <li class="phases__item" [class.phases__item_active]="index === timer.phaseIndex()" [class.phases__item_done]="index < timer.phaseIndex()">
-                <span class="phases__title">{{ phase.title }} · {{ round(phase.minutes) }} мин</span>
+                <span class="phases__title">{{ phase.title }} · {{ phase.minutes }} мин</span>
                 <span class="phases__hint">{{ phase.hint }}</span>
               </li>
             }
           </ol>
-          @if (step(); as current) {
-            <div class="stepBar">
-              <span class="stepBar__text num">
-                Осталось {{ current.remaining }} мин
-                @if (current.next) {
-                  · дальше: {{ current.next }}
-                }
-              </span>
-              <div class="stepBar__actions">
-                @if (current.hasPrevious) {
-                  <button tuiButton type="button" size="xs" appearance="secondary" iconStart="@tui.skip-back" (click)="timer.prevStep()">Предыдущий шаг</button>
-                }
-                @if (current.next) {
-                  <button tuiButton type="button" size="xs" appearance="secondary" iconEnd="@tui.skip-forward" (click)="timer.nextStep()">Следующий шаг</button>
-                }
-              </div>
-            </div>
-          }
         }
         @if (timer.previousTask()) {
           <div class="focus__task">

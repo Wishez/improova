@@ -1,15 +1,16 @@
 import { ChangeDetectionStrategy, Component, HostListener, computed, inject } from '@angular/core';
 import { TuiButton } from '@taiga-ui/core';
-import { CourseService, SessionDraftService, TimerService, UiStateService, stepEnd } from '../../services';
+import { CourseService, SessionDraftService, TimerService, UiStateService, type ITimerStepView } from '../../services';
 import { SESSION_TYPE_LABEL } from '../../utils';
 import { GuideCardComponent } from '../guide-card/guide-card.component';
 import { LessonInfoComponent } from '../lesson-info/lesson-info.component';
 import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.component';
-import { SESSION_TEXTS } from './session-texts';
+import { SESSION_TEXTS, stepProgressText } from './session-texts';
 
 /**
  * Режим фокуса: таймер, шаги ориентира, задание, конспект в markdown и ориентир рядом —
- * всё для сессии на одном экране (FR-35, FR-38).
+ * всё для сессии на одном экране (FR-35, FR-38). В сессии с шагами — список шагов с накопленным за круг (FR-53);
+ * без шагов — фазы шаблона FR-12, как в 1.5 (Д-1).
  */
 @Component({
   selector: 'app-focus-overlay',
@@ -42,23 +43,16 @@ export class FocusOverlayComponent {
     const limit = this.timer.totalMin();
     return this.over() ? this.texts['focus.session.over'](limit) : this.texts['focus.session.limit'](limit);
   });
-  protected readonly step = computed(() => {
-    const index = this.timer.phaseIndex();
-    const phases = this.timer.phases();
-    if (!this.timer.guideSteps() || index < 0) {
-      return null;
-    }
-    return {
-      remaining: Math.max(0, Math.ceil(stepEnd(phases, index) - this.timer.elapsed() / 60_000)),
-      next: phases[index + 1]?.title ?? null,
-      hasPrevious: index > 0,
-    };
+  /** Активный шаг и соседи для строки у кнопок смены шага; null — сессия без шагов ориентира. */
+  protected readonly bar = computed(() => {
+    const views = this.timer.stepViews();
+    const active = views.find((view) => view.active);
+    return active ? { active, prev: views[active.index - 1] ?? null, next: views[active.index + 1] ?? null, count: views.length } : null;
   });
   protected readonly isStudy = computed(() => this.timer.state()?.type === 'study');
 
-  /** После смены шагов длительности дробные — показываем целые минуты. */
-  protected round(minutes: number): number {
-    return Math.round(minutes);
+  protected progress(step: ITimerStepView): string {
+    return stepProgressText(step);
   }
 
   @HostListener('document:keydown.escape')
