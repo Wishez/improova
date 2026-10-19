@@ -83,7 +83,7 @@ export class TodayPage {
       .map((review) => ({ review, title: this.store.tree().itemById.get(review.itemId)?.title ?? '' })),
   );
   protected readonly lastNote = computed(() =>
-    [...this.store.data().notes]
+    [...this.store.notes()]
       .filter((note) => note.body.trim() || note.worked.trim() || note.next.trim())
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null,
   );
