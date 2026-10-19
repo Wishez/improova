@@ -251,3 +251,132 @@ describe('список шагов режима фокуса — накоплен
     ]);
   });
 });
+
+describe('смена шага в режиме фокуса — только действием владельца (FR-52)', () => {
+  const option = (h: IHarness, index: number): HTMLButtonElement | null => root(h).querySelectorAll<HTMLButtonElement>('button.stepItem')[index] ?? null;
+  const byText = (h: IHarness, label: string): HTMLButtonElement | null =>
+    [...root(h).querySelectorAll<HTMLButtonElement>('button')].find((button) => text(button) === label) ?? null;
+  const snapshot = (h: IHarness) => ({
+    clock: h.timer.clock(),
+    limit: text(root(h).querySelector('.focus__total')),
+    minutes: h.timer.stepViews().map((view) => view.doneMin),
+  });
+
+  it('ТК-23.3: «Следующий шаг» — активен шаг 3; часы, лимит и минуты шагов 1 и 2 прежние, дальше время идёт шагу 3 (US-23, критерий 3)', async () => {
+    const h = await render([artists]);
+    open(h, { itemId: 'artists', plannedMin: 45 });
+    await at(h, min(10));
+    byText(h, 'Следующий шаг')?.click();
+    await at(h, min(37));
+    const before = snapshot(h);
+    byText(h, 'Следующий шаг')?.click();
+    TestBed.tick();
+    expect(h.timer.activeStep()?.index).toBe(2);
+    expect(snapshot(h)).toEqual(before);
+    expect(before).toEqual({ clock: '37:00', limit: `Сессия · 45${NBSP}мин`, minutes: [10, 27, 0, 0] });
+    await at(h, min(38));
+    expect(progress(h)).toEqual([of(10, 10), `${of(27, 20)} · ${over(7)}`, of(1, 20), of(0, 10)]);
+  });
+
+  it('ТК-23.4: «Предыдущий шаг» и выбор шага в списке меняют активный шаг и на паузе; время, лимит и минуты не меняются (US-23, критерий 4)', async () => {
+    const h = await render([artists]);
+    open(h, { itemId: 'artists', plannedMin: 45 });
+    await at(h, min(4));
+    option(h, 2)?.click();
+    await at(h, min(7));
+    h.timer.pause();
+    TestBed.tick();
+    const before = snapshot(h);
+    byText(h, 'Предыдущий шаг')?.click();
+    TestBed.tick();
+    expect(h.timer.activeStep()?.index).toBe(1);
+    expect(snapshot(h)).toEqual(before);
+    option(h, 0)?.click();
+    TestBed.tick();
+    expect(h.timer.activeStep()?.index).toBe(0);
+    expect(items(h)[0]?.classList.contains('stepItem_active')).toBe(true);
+    await at(h, min(17));
+    expect(snapshot(h)).toEqual(before);
+    expect(before.minutes).toEqual([4, 0, 3, 0]);
+  });
+
+  it('любой шаг выбирается с клавиатуры: пункт списка — кнопка в порядке Tab, цель нажатия — весь пункт (НФТ «Доступность интерфейса»)', async () => {
+    const h = await render([sphere]);
+    open(h, { itemId: 'sphere', plannedMin: 45 });
+    const options = [...root(h).querySelectorAll<HTMLButtonElement>('button.stepItem')];
+    expect(options).toHaveLength(3);
+    for (const entry of options) {
+      expect(entry.type).toBe('button');
+      expect(entry.disabled).toBe(false);
+      expect(entry.tabIndex).toBe(0);
+    }
+    options[2]?.focus();
+    expect(document.activeElement).toBe(options[2]);
+    options[2]?.click();
+    TestBed.tick();
+    expect(h.timer.activeStep()?.index).toBe(2);
+  });
+
+  it('на первом шаге нет «Предыдущий шаг», на последнем — «Следующий шаг»: кнопки за концом списка не показываются', async () => {
+    const h = await render([sphere]);
+    open(h, { itemId: 'sphere', plannedMin: 45 });
+    expect(byText(h, 'Предыдущий шаг')).toBeNull();
+    expect(byText(h, 'Следующий шаг')).not.toBeNull();
+    h.timer.selectStep(2);
+    TestBed.tick();
+    expect(byText(h, 'Предыдущий шаг')).not.toBeNull();
+    expect(byText(h, 'Следующий шаг')).toBeNull();
+  });
+
+  it('ТК-Н11: читалка называет активный шаг — имена списка, шагов, блока и кнопок из вкладки «Тексты 1.6»; активный отмечен словом «текущий»', async () => {
+    const h = await render([artists]);
+    open(h, { itemId: 'artists', plannedMin: 45 });
+    await at(h, min(10));
+    h.timer.nextStep();
+    await at(h, min(37));
+    const list = root(h).querySelector('ol.steps__list');
+    const label = root(h).querySelector(`#${list?.getAttribute('aria-labelledby') ?? 'none'}`);
+    expect(text(label)).toBe('Шаги — выбери, над каким работаешь');
+    expect([...root(h).querySelectorAll('button.stepItem')].map((entry) => entry.getAttribute('aria-label'))).toEqual([
+      `Шаг 1: Контекст: годы, школа, техника, ${of(10, 10)}`,
+      `Шаг 2: 10 работ в высоком разрешении, ${of(27, 20)}, ${over(7)}, текущий`,
+      `Шаг 3: 3 штудии по 6 минут, ${of(0, 20)}`,
+      `Шаг 4: Заметка, ${of(0, 10)}`,
+    ]);
+    expect(text(items(h)[1]?.querySelector('.stepItem__current') ?? null)).toBe('текущий');
+    expect(items(h).filter((entry) => entry.querySelector('.stepItem__current'))).toHaveLength(1);
+    const bar = root(h).querySelector('.stepBar');
+    expect(bar?.getAttribute('role')).toBe('group');
+    expect(bar?.getAttribute('aria-label')).toBe('Текущий шаг 2 из 4: 10 работ в высоком разрешении');
+    expect(byText(h, 'Предыдущий шаг')?.getAttribute('aria-label')).toBe('Предыдущий шаг: Контекст: годы, школа, техника');
+    expect(byText(h, 'Следующий шаг')?.getAttribute('aria-label')).toBe('Следующий шаг: 3 штудии по 6 минут');
+    // Смена шага и рост минут вслух не объявляются: в режиме фокуса нет живых областей про шаги
+    expect(root(h).querySelector('.steps [aria-live], .stepBar[aria-live], .focus__total[aria-live]')).toBeNull();
+  });
+
+  it('карточка ориентира рядом отмечает активный шаг словом «текущий»; под шагами — «шаг переключаешь сам» вместо «таймер ведёт шаги» 1.5', async () => {
+    const h = await render([sphere]);
+    open(h, { itemId: 'sphere', plannedMin: 45 });
+    h.timer.selectStep(1);
+    TestBed.tick();
+    const guide = root(h).querySelector('.focus__guide');
+    const rows = [...(guide?.querySelectorAll('.guide__step') ?? [])];
+    expect(rows.map((row) => row.querySelector('.guide__current')?.textContent?.trim() ?? null)).toEqual([null, 'текущий', null]);
+    expect(text(guide?.querySelector('.guide__meta') ?? null)).toBe(`Шаги сессии — 90${NBSP}мин по плану, шаг переключаешь сам`);
+    expect(guide?.textContent ?? '').not.toContain('таймер ведёт шаги');
+  });
+
+  it('открытый режим фокуса получает фокус, после «Выйти · Esc» фокус возвращается туда, откуда открыли', async () => {
+    const h = await render([sphere]);
+    const opener = document.createElement('button');
+    document.body.appendChild(opener);
+    opener.focus();
+    open(h, { itemId: 'sphere', plannedMin: 45 });
+    const dialog = root(h).querySelector('[role="dialog"]');
+    expect(document.activeElement).toBe(dialog);
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    TestBed.tick();
+    expect(root(h).querySelector('[role="dialog"]')).toBeNull();
+    expect(document.activeElement).toBe(opener);
+  });
+});

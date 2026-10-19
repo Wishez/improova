@@ -1,6 +1,6 @@
-<section class="guide" aria-labelledby="guide-title">
+<section class="guide" [attr.aria-labelledby]="titleId">
   <div class="guide__head">
-    <h3 id="guide-title" class="card__title guide__h">Ориентир</h3>
+    <h3 class="card__title guide__h" [id]="titleId">Ориентир</h3>
     @if (!editing() && guide() && !session()) {
       <button tuiButton type="button" size="xs" appearance="flat" iconStart="@tui.pencil" (click)="edit()">Изменить</button>
     }
@@ -149,10 +149,13 @@
     @if (current.steps.length > 0) {
       <ol class="guide__steps">
         @for (entry of resolved()?.steps ?? []; track $index; let index = $index) {
-          <li class="guide__step" [class.guide__step_active]="index === activeStep()" [attr.aria-current]="index === activeStep() ? 'step' : null">
+          <li class="guide__step" [class.guide__step_active]="index === activeStep()">
             <div class="guide__stepRow">
               <span>{{ entry.label }}</span>
               <span class="muted num">{{ entry.minutes }} мин</span>
+              @if (index === activeStep()) {
+                <span class="guide__current">{{ texts['focus.steps.current'] }}</span>
+              }
             </div>
             @if (entry.route === 'missing') {
               <p class="guide__hint muted">Техника маршрута не задана на эту дату</p>
@@ -165,7 +168,7 @@
           </li>
         }
       </ol>
-      <p class="guide__meta muted num">Шаги сессии — {{ total() }} мин, таймер ведёт шаги по этим минутам</p>
+      <p class="guide__meta muted num">{{ texts['guide.steps.total'](total()) }}</p>
     }
     @if (current.stopCriterion) {
       <p class="guide__p"><span class="guide__k">Стоп-критерий</span> {{ current.stopCriterion }}</p>

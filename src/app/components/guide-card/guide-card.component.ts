@@ -5,6 +5,7 @@ import { TECHNIQUES } from '../../seed';
 import { CourseService, DataStore, ProgramService } from '../../services';
 import type { IGuide, IGuideLink, IGuideStep, IItem, TLinkAccess } from '../../types';
 import { ACCESS_LABEL } from '../../utils';
+import { SESSION_TEXTS } from '../focus-overlay/session-texts';
 import { TechniqueCardComponent } from '../technique-card/technique-card.component';
 
 interface IGuideDraft {
@@ -29,6 +30,9 @@ const toDraft = (guide: IGuide): IGuideDraft => ({
 
 const emptyLink = (): IGuideLink => ({ title: '', url: '', locator: '', access: 'free' });
 
+/** Номер карточки на странице: карточка топика и карточка в режиме фокуса бывают открыты вместе, id заголовка — свой у каждой. */
+let nextCardId = 0;
+
 /**
  * Ориентир топика в карточке: просмотр и редактирование по полям (FR-37), блок маршрута мастеров (FR-39),
  * «Как делать» у шагов и задания из справочника приёмов (FR-48, FR-49).
@@ -44,13 +48,15 @@ export class GuideCardComponent {
   readonly item = input.required<IItem>();
   /** Режим фокуса: ориентир целиком, только чтение — без правки и приглашения заполнить. */
   readonly session = input(false);
-  /** Текущий шаг таймера в сессии — подсвечивается в списке шагов; null — вне сессии. */
+  /** Текущий шаг таймера в сессии — отмечен словом «текущий», подсветка только дополняет; null — вне сессии. */
   readonly activeStep = input<number | null>(null);
 
   private readonly store = inject(DataStore);
   private readonly program = inject(ProgramService);
   private readonly course = inject(CourseService);
 
+  protected readonly titleId = `guide-title-${nextCardId++}`;
+  protected readonly texts = SESSION_TEXTS;
   protected readonly accessLabel = ACCESS_LABEL;
   /** Правки ориентира нестартового топика курса заменятся при обновлении курса (FR-44). */
   protected readonly courseHint = computed(() => {

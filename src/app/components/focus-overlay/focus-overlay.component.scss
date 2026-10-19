@@ -1,7 +1,7 @@
 @reference '../../../tailwind.css';
 
 .focus {
-  @apply fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-bg px-4 py-10;
+  @apply fixed inset-0 z-40 flex items-start justify-center overflow-y-auto bg-bg px-4 py-10 outline-none;
   animation: focusIn var(--duration-slow) var(--ease-standard);
 }
 
@@ -58,17 +58,27 @@
   @apply text-meta text-text-3;
 }
 
-/* Шаги ориентира в сессии (FR-53): у каждого накопленное за круг; на узком экране числа уходят на вторую строку */
+/* Шаги ориентира в сессии: у каждого накопленное за круг (FR-53), любой выбирается мышью и с клавиатуры (FR-52) */
 .steps {
+  @apply flex flex-col gap-2;
+}
+
+.steps__label {
+  @apply text-meta text-text-3;
+}
+
+.steps__list {
   @apply m-0 flex list-none flex-col gap-2 p-0;
 }
 
+/* На узком экране числа уходят на вторую строку целиком: название уступает место «X из Y» */
 .stepItem {
-  @apply flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-control border border-border p-3 text-body text-text-1 transition-colors duration-(--duration-base);
+  @apply flex w-full cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-1 rounded-control border border-border bg-transparent p-3 text-left font-sans text-body text-text-1 transition-colors duration-(--duration-base) hover:bg-surface-1;
 }
 
+/* Активный шаг отмечен словом «текущий», рамка — только дополнение */
 .stepItem_active {
-  @apply border-accent bg-surface-2;
+  @apply border-accent bg-surface-2 hover:bg-surface-2;
 }
 
 .stepItem__n {
@@ -79,13 +89,21 @@
   @apply min-w-0 flex-1 basis-48 font-semibold;
 }
 
+.stepItem__meta {
+  @apply ml-auto flex flex-wrap items-baseline justify-end gap-x-2;
+}
+
 .stepItem__progress {
-  @apply ml-auto text-meta text-text-2;
+  @apply text-meta text-text-2;
 }
 
 /* Переработка написана текстом «+N сверх плана», цвет только дополняет */
 .stepItem__progress_over {
   @apply text-warning;
+}
+
+.stepItem__current {
+  @apply rounded-control bg-surface-3 px-1.5 py-0.5 text-micro font-semibold text-text-1;
 }
 
 .stepBar {
