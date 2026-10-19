@@ -32,7 +32,7 @@ interface ICommand {
         />
         <ul class="dlg__list" role="listbox" aria-label="Команды">
           @for (command of commands(); track command.id; let index = $index) {
-            <li>
+            <li role="none">
               <button
                 type="button"
                 role="option"
@@ -46,7 +46,7 @@ interface ICommand {
               </button>
             </li>
           } @empty {
-            <li class="dlg__group">Ничего не найдено</li>
+            <li role="none" class="dlg__group">Ничего не найдено</li>
           }
         </ul>
       </div>

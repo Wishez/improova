@@ -1,0 +1,5 @@
+@reference '../../../tailwind.css';
+
+:host {
+  @apply block text-meta text-text-2;
+}

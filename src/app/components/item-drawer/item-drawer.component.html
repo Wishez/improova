@@ -18,16 +18,19 @@
     <div class="drawer__body">
       <input class="drawer__title" type="text" aria-label="Название топика" [value]="current.title" (change)="rename($event)" (keydown.enter)="rename($event)" />
 
-      <div class="drawer__actions">
-        <button tuiButton type="button" size="m" iconStart="@tui.play" [disabled]="timer.item()?.id === current.id" (click)="start()">
-          {{ timer.item()?.id === current.id ? 'Идёт сессия' : 'Старт' }}
-        </button>
-        @if (countable()) {
-          <label class="drawer__done">
-            <input tuiCheckbox type="checkbox" size="m" [ngModel]="current.doneAt !== null" (ngModelChange)="toggleDone()" />
-            <span>{{ current.doneAt ? 'Пройден' : 'Отметить пройденным' }}</span>
-          </label>
-        }
+      <div class="drawer__start">
+        <div class="drawer__actions">
+          <button tuiButton type="button" size="m" iconStart="@tui.play" aria-describedby="drawerStartHint" [disabled]="running()" (click)="start()">
+            {{ running() ? 'Идёт сессия' : 'Старт' }}
+          </button>
+          @if (countable()) {
+            <label class="drawer__done">
+              <input tuiCheckbox type="checkbox" size="m" [ngModel]="current.doneAt !== null" (ngModelChange)="toggleDone()" />
+              <span>{{ current.doneAt ? 'Пройден' : 'Отметить пройденным' }}</span>
+            </label>
+          }
+        </div>
+        <app-start-hint id="drawerStartHint" class="drawer__hint" [hint]="startHint()" />
       </div>
 
       <app-guide-card [item]="current" />

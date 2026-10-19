@@ -4,17 +4,18 @@ import { TuiButton, TuiCheckbox, TuiDialog } from '@taiga-ui/core';
 import { TuiSwitch } from '@taiga-ui/kit';
 import { estimateFromResource, isCountable, reviewState, topicBeforeAfter } from '../../domain';
 import { DayShortPipe, MarkdownPipe, MinutesPipe } from '../../pipes';
-import { DataStore, NotesService, PlanService, ProgramService, TimerService, UiStateService } from '../../services';
+import { DataStore, NotesService, PlanService, ProgramService, StopPlaceService, TimerService, UiStateService } from '../../services';
 import type { IResourceRef, TItemKind } from '../../types';
 import { RESOURCE_TYPE_LABEL } from '../../utils';
 import { GuideCardComponent } from '../guide-card/guide-card.component';
 import { LogListComponent } from '../log-list/log-list.component';
 import { NoteEditorComponent } from '../note-editor/note-editor.component';
+import { StartHintComponent } from '../start-hint/start-hint.component';
 
 /** Карточка топика: ориентир, пояснение, ресурсы, время, логи, заметки, старт и галочка (FR-08, FR-37). */
 @Component({
   selector: 'app-item-drawer',
-  imports: [FormsModule, TuiButton, TuiCheckbox, TuiSwitch, TuiDialog, MinutesPipe, DayShortPipe, MarkdownPipe, LogListComponent, NoteEditorComponent, GuideCardComponent],
+  imports: [FormsModule, TuiButton, TuiCheckbox, TuiSwitch, TuiDialog, MinutesPipe, DayShortPipe, MarkdownPipe, LogListComponent, NoteEditorComponent, GuideCardComponent, StartHintComponent],
   templateUrl: './item-drawer.component.html',
   styleUrl: './item-drawer.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -24,6 +25,7 @@ export class ItemDrawerComponent {
   private readonly program = inject(ProgramService);
   private readonly notesService = inject(NotesService);
   private readonly planner = inject(PlanService);
+  private readonly stopPlace = inject(StopPlaceService);
   protected readonly timer = inject(TimerService);
   protected readonly ui = inject(UiStateService);
   private readonly panel = viewChild<ElementRef<HTMLElement>>('panel');
@@ -31,15 +33,15 @@ export class ItemDrawerComponent {
   protected readonly resourceTypeLabel = RESOURCE_TYPE_LABEL;
   protected readonly item = computed(() => {
     const id = this.ui.drawerItemId();
-    return id ? (this.store.data().items.find((entry) => entry.id === id) ?? null) : null;
+    return id ? (this.store.items().find((entry) => entry.id === id) ?? null) : null;
   });
   protected readonly topic = computed(() => {
     const item = this.item();
-    return item ? (this.store.data().topics.find((entry) => entry.id === item.topicId) ?? null) : null;
+    return item ? (this.store.topics().find((entry) => entry.id === item.topicId) ?? null) : null;
   });
   protected readonly section = computed(() => {
     const topic = this.topic();
-    return topic ? (this.store.data().sections.find((entry) => entry.id === topic.sectionId) ?? null) : null;
+    return topic ? (this.store.sections().find((entry) => entry.id === topic.sectionId) ?? null) : null;
   });
   protected readonly spent = computed(() => this.store.spent().get(this.item()?.id ?? '') ?? 0);
   protected readonly spentRatio = computed(() => {
@@ -47,6 +49,16 @@ export class ItemDrawerComponent {
     return estimate > 0 ? Math.min(1, this.spent() / estimate) : 0;
   });
   protected readonly remaining = computed(() => this.planner.plan().remainingByItem.get(this.item()?.id ?? '') ?? 0);
+  /** Сессия этого топика идёт: кнопка «Идёт сессия», подсказки до старта нет. */
+  protected readonly running = computed(() => {
+    const id = this.item()?.id;
+    return id !== undefined && this.timer.state()?.itemId === id;
+  });
+  /** Подсказка карточки — для сессии вида топика (FR-58): с этого шага начнёт «Старт» карточки. */
+  protected readonly startHint = computed(() => {
+    const id = this.item()?.id;
+    return id === undefined || this.running() ? null : (this.stopPlace.byItem().get(id)?.hint ?? null);
+  });
   protected readonly countable = computed(() => {
     const item = this.item();
     return item !== null && isCountable(item);
@@ -54,15 +66,15 @@ export class ItemDrawerComponent {
   protected readonly logs = computed(() => this.store.logs().filter((log) => log.itemId === this.item()?.id));
   protected readonly notes = computed(() =>
     this.store
-      .data()
-      .notes.filter((note) => note.itemId === this.item()?.id)
+      .notes()
+      .filter((note) => note.itemId === this.item()?.id)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
   );
   protected readonly refs = computed(() => {
     const resources = this.store.resourcesById();
     return (this.item()?.resourceRefs ?? []).map((ref) => ({ ref, resource: resources.get(ref.resourceId) ?? null }));
   });
-  protected readonly library = computed(() => this.store.data().resources.filter((resource) => !resource.archived));
+  protected readonly library = computed(() => this.store.resources().filter((resource) => !resource.archived));
   protected readonly review = computed(() => {
     const item = this.item();
     return item
@@ -75,8 +87,8 @@ export class ItemDrawerComponent {
     return topic
       ? topicBeforeAfter({
           topicId: topic.id,
-          items: this.store.data().items,
-          notes: this.store.data().notes,
+          items: this.store.items(),
+          notes: this.store.notes(),
           assets: this.store.assetsById(),
           boundaryHour: this.store.settings().dayBoundaryHour,
         })
@@ -236,7 +248,7 @@ export class ItemDrawerComponent {
   }
 
   private dropIfEmpty(id: string): void {
-    const note = this.store.data().notes.find((entry) => entry.id === id);
+    const note = this.store.notes().find((entry) => entry.id === id);
     if (note && this.notesService.isEmpty(note)) {
       this.store.remove('notes', [id]);
     }
