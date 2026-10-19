@@ -1,5 +1,5 @@
 @if (open()) {
-  <section class="focus" role="dialog" aria-modal="true" aria-label="Режим фокуса">
+  <section #dialog class="focus" role="dialog" aria-modal="true" aria-label="Режим фокуса" tabindex="-1">
     <div class="focus__layout" [class.focus__layout_withGuide]="item() !== null">
       <div class="focus__inner">
         <header class="focus__head">
@@ -8,9 +8,7 @@
         </header>
         <div class="focus__clock num" [class.focus__clock_paused]="timer.paused()">{{ timer.clock() }}</div>
         @if (timer.totalMin() > 0) {
-          <p class="focus__total num" [class.focus__total_over]="over()">
-            {{ over() ? 'Время сессии вышло' : 'Сессия' }} · {{ round(timer.totalMin()) }} мин
-          </p>
+          <p class="focus__total num" [class.focus__total_over]="over()">{{ limitText() }}</p>
         }
         @if (task()) {
           <div class="focus__task">
@@ -18,33 +16,72 @@
             <span>{{ task() }}</span>
           </div>
         }
-        @if (timer.phaseIndex() >= 0) {
+        @if (bar(); as current) {
+          <div class="steps">
+            <span id="focus-steps-label" class="steps__label">{{ texts['focus.steps.label'] }}</span>
+            <ol class="steps__list" aria-labelledby="focus-steps-label">
+              @for (step of timer.stepViews(); track step.index) {
+                <li>
+                  <button
+                    type="button"
+                    class="stepItem"
+                    [class.stepItem_active]="step.active"
+                    [attr.aria-label]="optionName(step)"
+                    (click)="timer.selectStep(step.index)"
+                  >
+                    <span class="stepItem__n num">{{ step.index + 1 }}</span>
+                    <span class="stepItem__title">{{ step.title }}</span>
+                    <span class="stepItem__meta">
+                      <span class="stepItem__progress num" [class.stepItem__progress_over]="step.overMin > 0">{{ progress(step) }}</span>
+                      @if (step.active) {
+                        <span class="stepItem__current">{{ texts['focus.steps.current'] }}</span>
+                      }
+                    </span>
+                  </button>
+                </li>
+              }
+            </ol>
+          </div>
+          <div class="stepBar" role="group" [attr.aria-label]="texts['a11y.focus.currentStep'](current.active, current.count)">
+            <span class="stepBar__text">{{ current.next ? texts['focus.stepBar.next'](current.next.title) : texts['focus.stepBar.last'] }}</span>
+            <div class="stepBar__actions">
+              @if (current.prev; as prev) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="secondary"
+                  iconStart="@tui.skip-back"
+                  [attr.aria-label]="texts['a11y.focus.prev'](prev.title)"
+                  (click)="timer.prevStep()"
+                >
+                  {{ texts['focus.step.prev'] }}
+                </button>
+              }
+              @if (current.next; as next) {
+                <button
+                  tuiButton
+                  type="button"
+                  size="s"
+                  appearance="secondary"
+                  iconEnd="@tui.skip-forward"
+                  [attr.aria-label]="texts['a11y.focus.next'](next.title)"
+                  (click)="timer.nextStep()"
+                >
+                  {{ texts['focus.step.next'] }}
+                </button>
+              }
+            </div>
+          </div>
+        } @else if (timer.phaseIndex() >= 0) {
           <ol class="phases">
             @for (phase of timer.phases(); track $index; let index = $index) {
               <li class="phases__item" [class.phases__item_active]="index === timer.phaseIndex()" [class.phases__item_done]="index < timer.phaseIndex()">
-                <span class="phases__title">{{ phase.title }} · {{ round(phase.minutes) }} мин</span>
+                <span class="phases__title">{{ phase.title }} · {{ phase.minutes }} мин</span>
                 <span class="phases__hint">{{ phase.hint }}</span>
               </li>
             }
           </ol>
-          @if (step(); as current) {
-            <div class="stepBar">
-              <span class="stepBar__text num">
-                Осталось {{ current.remaining }} мин
-                @if (current.next) {
-                  · дальше: {{ current.next }}
-                }
-              </span>
-              <div class="stepBar__actions">
-                @if (current.hasPrevious) {
-                  <button tuiButton type="button" size="xs" appearance="secondary" iconStart="@tui.skip-back" (click)="timer.prevStep()">Предыдущий шаг</button>
-                }
-                @if (current.next) {
-                  <button tuiButton type="button" size="xs" appearance="secondary" iconEnd="@tui.skip-forward" (click)="timer.nextStep()">Следующий шаг</button>
-                }
-              </div>
-            </div>
-          }
         }
         @if (timer.previousTask()) {
           <div class="focus__task">
@@ -72,12 +109,12 @@
           <button tuiButton type="button" size="m" appearance="secondary" [iconStart]="timer.paused() ? '@tui.play' : '@tui.pause'" (click)="timer.toggle()">
             {{ timer.paused() ? 'Продолжить' : 'Пауза' }}
           </button>
-          <button tuiButton type="button" size="m" iconStart="@tui.square" (click)="timer.stop()">Стоп</button>
+          <button tuiButton type="button" size="m" iconStart="@tui.square" (click)="timer.stop()">{{ texts['focus.stop'] }}</button>
         </div>
       </div>
       @if (item(); as current) {
         <aside class="focus__guide" aria-label="Карточка урока">
-          <app-guide-card [item]="current" [session]="true" [activeStep]="timer.guideSteps() ? timer.phaseIndex() : null" />
+          <app-guide-card [item]="current" [session]="true" [activeStep]="activeStep()" />
           <app-lesson-info [item]="current" />
         </aside>
       }

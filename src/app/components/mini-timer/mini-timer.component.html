@@ -1,29 +1,39 @@
+<!-- Вслух — только старт сессии: часы и минуты шага не объявляются (НФТ «Доступность интерфейса») -->
+<span class="visuallyHidden" role="status">{{ timer.running() ? title() : '' }}</span>
 @if (timer.state(); as state) {
-  <div class="miniTimer" [class.miniTimer_paused]="timer.paused()" aria-live="polite">
+  <div class="miniTimer" [class.miniTimer_paused]="timer.paused()">
     <span class="miniTimer__pulse" aria-hidden="true"></span>
     <div class="miniTimer__info">
       <span class="miniTimer__title">{{ title() }}</span>
-      @if (phase(); as current) {
+      @if (step(); as current) {
+        <span class="miniTimer__step">
+          <span class="miniTimer__stepName" aria-hidden="true">{{ current.name }}</span>
+          <span class="miniTimer__stepProgress num" [class.miniTimer__stepProgress_over]="current.over" aria-hidden="true">{{ current.progress }}</span>
+          <span class="visuallyHidden">{{ current.label }}</span>
+        </span>
+      } @else if (phase(); as current) {
         <span class="miniTimer__phase">{{ current.title }}</span>
       }
     </div>
-    <span class="miniTimer__clock num">{{ timer.clock() }}</span>
-    <div class="miniTimer__actions">
-      <button
-        tuiIconButton
-        type="button"
-        size="s"
-        appearance="flat"
-        [iconStart]="timer.paused() ? '@tui.play' : '@tui.pause'"
-        [tuiHint]="timer.paused() ? 'Продолжить' : 'Пауза'"
-        (click)="timer.toggle()"
-      >
-        {{ timer.paused() ? 'Продолжить' : 'Пауза' }}
-      </button>
-      <button tuiIconButton type="button" size="s" appearance="flat" iconStart="@tui.maximize-2" tuiHint="Режим фокуса" (click)="ui.focusMode.set(true)">
-        Режим фокуса
-      </button>
-      <button tuiButton type="button" size="s" appearance="primary" iconStart="@tui.square" (click)="timer.stop()">Стоп</button>
+    <div class="miniTimer__controls">
+      <span class="miniTimer__clock num">{{ timer.clock() }}</span>
+      <div class="miniTimer__actions">
+        <button
+          tuiIconButton
+          type="button"
+          size="s"
+          appearance="flat"
+          [iconStart]="timer.paused() ? '@tui.play' : '@tui.pause'"
+          [tuiHint]="timer.paused() ? 'Продолжить' : 'Пауза'"
+          (click)="timer.toggle()"
+        >
+          {{ timer.paused() ? 'Продолжить' : 'Пауза' }}
+        </button>
+        <button tuiIconButton type="button" size="s" appearance="flat" iconStart="@tui.maximize-2" tuiHint="Режим фокуса" (click)="ui.focusMode.set(true)">
+          Режим фокуса
+        </button>
+        <button tuiButton type="button" size="s" appearance="primary" iconStart="@tui.square" (click)="timer.stop()">{{ stopText }}</button>
+      </div>
     </div>
   </div>
 } @else {
