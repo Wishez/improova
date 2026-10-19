@@ -652,3 +652,66 @@ describe('старт без вопросов из пяти точек: шаг и
     }
   });
 });
+
+describe('лимит сессии при старте — как в FR-55 (Q-006)', () => {
+  it('блок и Space — минуты блока', async () => {
+    const points: readonly TStartPoint[] = ['блок', 'Space'];
+    for (const point of points) {
+      const shell = await boot({
+        items: [topic({})],
+        logs: [placeM1()],
+        blocks: [block({ plannedMin: 45 })],
+      });
+      await startFrom(shell, point);
+      expect(shell.timer.state()?.plannedMin).toBe(45);
+      expect(shell.timer.totalMin()).toBe(45);
+    }
+  });
+
+  it('карточка — остаток топика в пределах 20–90 мин: 48 при остатке 48, 90 при большом остатке, 20 при малом', async () => {
+    const cases: readonly { readonly estimateMin: number; readonly limit: number }[] = [
+      { estimateMin: 60, limit: 48 },
+      { estimateMin: 600, limit: 90 },
+      { estimateMin: 20, limit: 20 },
+    ];
+    for (const entry of cases) {
+      const shell = await boot({
+        items: [topic({ estimateMin: entry.estimateMin })],
+        logs: [placeM1()],
+      });
+      await startFrom(shell, 'карточка');
+      expect(shell.timer.state()?.plannedMin).toBe(entry.limit);
+    }
+  });
+
+  it('быстрый выбор и палитра — оценка топика, не больше 90 мин', async () => {
+    const points: readonly TStartPoint[] = ['быстрый выбор', 'палитра'];
+    const cases: readonly { readonly estimateMin: number; readonly limit: number }[] = [
+      { estimateMin: 60, limit: 60 },
+      { estimateMin: 600, limit: 90 },
+    ];
+    for (const point of points) {
+      for (const entry of cases) {
+        const shell = await boot({
+          items: [topic({ estimateMin: entry.estimateMin })],
+          logs: [placeM1()],
+        });
+        await startFrom(shell, point);
+        expect(shell.timer.state()?.plannedMin).toBe(entry.limit);
+      }
+    }
+  });
+
+  it('«Старт 20 мин» после пропущенного дня — 20 мин, шаг старта как в подсказке первого блока «Сегодня»', async () => {
+    const shell = await boot({ items: [topic({})], logs: [placeM1()], blocks: [block()] });
+    const hint = todayHint(shell);
+    expect(hint).toBe(CONTINUE_3);
+    const buttons = [...shell.root.querySelectorAll<HTMLElement>('.tip__actions button')];
+    await click(
+      shell,
+      buttons.find((button) => normalize(button.textContent) === 'Старт 20 мин'),
+    );
+    expect(shell.timer.state()?.plannedMin).toBe(20);
+    expectStartMatches(shell, hint);
+  });
+});
