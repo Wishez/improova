@@ -278,6 +278,34 @@ describe('лимит сессии — длина при старте, шаги �
     expect(steps(h)).toMatchObject({ activeIndex: 0, startIndex: 0, continuesCircle: false });
   });
 
+  it('ТК-А39: старт по топику с ориентиром 10 / 20 / 30 с длиной 0, −5 или NaN — сессия с шагами, лимит 60 = сумма шагов, «Время сессии вышло: 60 мин» один раз на 60:00, в логе «Стоп» limitMin 60; контроль 45 — лимит 45 (FR-55; Q-035, Q-037)', async () => {
+    const tens = topic({ id: 'tens', steps: [['Шаг 1', 10], ['Шаг 2', 20], ['Шаг 3', 30]] });
+    const cases: readonly (readonly [string, number, number])[] = [
+      ['0', 0, 60],
+      ['−5', -5, 60],
+      ['NaN', Number.NaN, 60],
+      ['контроль', 45, 45],
+    ];
+    for (const [name, plannedMin, limit] of cases) {
+      vi.setSystemTime(START);
+      const h = await bootWith([tens]);
+      expect(h.timer.start({ itemId: 'tens', type: 'practice', plannedMin }), name).toBe(true);
+      expect(h.timer.state(), name).toMatchObject({ plannedMin: limit, legacySchedule: false, stepMinutes: null });
+      expect(steps(h), name).toMatchObject({ activeIndex: 0, stepCount: 3, limitSignaled: false });
+      expect(h.timer.totalMin(), name).toBe(limit);
+
+      await at(min(limit) - sec(1));
+      expect(count(h, sessionEndText(limit)), name).toBe(0);
+      await at(min(limit));
+      expect(count(h, sessionEndText(limit)), name).toBe(1);
+      await at(min(61));
+      expect(texts(h).filter((text) => text.startsWith('Время сессии вышло')), name).toEqual([sessionEndText(limit)]);
+
+      const logId = await h.timer.stop();
+      expect((await stored(h)).logs.find((log) => log.id === logId), name).toMatchObject({ durationMin: 61, steps: { limitMin: limit } });
+    }
+  });
+
   it('ТК-А04: сигнал лимита один раз и только со «Стоп», после перезагрузки не повторяется; минуты идут активному шагу (US-24, критерии 2, 7; Q-010; Д-21)', async () => {
     let h = await bootWith([sphere]);
     h.timer.start({ itemId: 'sphere', type: 'practice', plannedMin: 45 });
