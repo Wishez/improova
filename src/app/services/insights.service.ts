@@ -15,11 +15,12 @@ export class InsightsService {
   readonly celebration = signal<IMilestone | null>(null);
   private readonly dismissedToday = signal<readonly string[]>([]);
 
+  /** Из срезов коллекций, не из `store.data()`: запись таймера в `meta` метрики и вехи не пересчитывает (НФТ «Время отклика»). */
   readonly metrics = computed(() =>
     computeMetrics({
       logs: this.store.logs(),
-      notes: this.store.data().notes,
-      items: this.store.data().items,
+      notes: this.store.notes(),
+      items: this.store.items(),
       budget: this.store.budget(),
       challenge: this.store.challenge(),
       today: this.store.today(),
@@ -94,7 +95,7 @@ export class InsightsService {
       challenge: this.store.challenge(),
       today: this.store.today(),
       rhythmStreak: this.metrics().rhythmStreak,
-      sections: this.store.data().sections,
+      sections: this.store.sections(),
     }),
   );
 

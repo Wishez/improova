@@ -180,7 +180,7 @@ export class TimerService {
   readonly clock = computed(() => formatClock(this.elapsed()));
   readonly item = computed(() => {
     const id = this.state()?.itemId;
-    return id ? (this.store.data().items.find((item) => item.id === id) ?? null) : null;
+    return id ? (this.store.items().find((item) => item.id === id) ?? null) : null;
   });
   /** Шаги идущей сессии (ADR-007); null — сессия без шагов или таймер 1.5 до перевода. */
   readonly sessionSteps = computed(() => this.state()?.steps ?? null);
@@ -258,8 +258,8 @@ export class TimerService {
       return '';
     }
     const notes = this.store
-      .data()
-      .notes.filter((note) => note.itemId === itemId && note.next.trim().length > 0)
+      .notes()
+      .filter((note) => note.itemId === itemId && note.next.trim().length > 0)
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     return notes[0]?.next ?? '';
   });

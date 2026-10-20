@@ -114,9 +114,9 @@ export class StopPlaceService {
   private readonly course = inject(CourseService);
   private readonly plan = inject(PlanService);
 
-  // Коллекции, а не `store.logs()`: у них новая ссылка только при изменении самой коллекции
-  private readonly items = computed(() => this.store.data().items);
-  private readonly timeLogs = computed(() => this.store.data().timeLogs);
+  // Срезы коллекций, а не `store.logs()`: у них новая ссылка только при изменении самой коллекции
+  private readonly items = this.store.items;
+  private readonly timeLogs = this.store.timeLogs;
   private readonly itemById = computed(() => new Map(this.items().map((item) => [item.id, item])));
   private readonly countedLogs = computed(() =>
     countedLogsByItem({ logs: this.timeLogs(), items: this.items() }),

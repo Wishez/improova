@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi, type MockInstance } fr
 import { stepStart, type IStepCalendar } from '../domain';
 import { itemFixture } from '../domain/test-fixtures';
 import { MemoryAdapter, STORAGE_ADAPTER, type IWriteBatch } from '../storage';
-import type { IGuide, IItem, ILogSteps, ITimeLog, ITimerState, TItemKind } from '../types';
+import type { IGuide, IItem, ILogSteps, INote, ITimeLog, ITimerState, TItemKind } from '../types';
 import { DataStore, defaultMeta } from './data.store';
 import { ToastService } from './toast.service';
 import { DEEP_WORK_LIMIT_MIN, TimerService, buildPhases, sessionEndText, shortStepTitle, stepPlanDoneText } from './timer.service';
@@ -971,5 +971,55 @@ describe('таймер, запущенный до 1.6 (FR-65, US-32)', () => {
       expect(count(h, sessionEndText(90))).toBe(1);
       vi.setSystemTime(START);
     }
+  });
+});
+
+describe('топик сессии и задача из прошлой сессии — из коллекций топиков и заметок (НФТ «Время отклика»)', () => {
+  /** Заметка к топику с полем «Что дальше». */
+  const note = (params: { readonly id: string; readonly itemId: string; readonly next: string }): INote => ({
+    id: params.id,
+    createdAt: new Date(Date.now()).toISOString(),
+    updatedAt: new Date(Date.now()).toISOString(),
+    itemId: params.itemId,
+    logId: null,
+    body: '',
+    worked: '',
+    failed: '',
+    next: params.next,
+    imageIds: [],
+  });
+
+  it('заметка с «Что дальше» по топику сессии сразу даёт задачу из прошлой сессии; заметка по другому топику — нет', async () => {
+    const h = await bootWith([sphere, light]);
+    h.timer.start({ itemId: 'sphere', type: 'practice', plannedMin: 45 });
+    expect(h.timer.previousTask()).toBe('');
+
+    h.store.upsert('notes', note({ id: 'n1', itemId: 'light', next: 'Падающие тени от куба' }));
+    expect(h.timer.previousTask()).toBe('');
+
+    h.store.upsert('notes', note({ id: 'n2', itemId: 'sphere', next: 'Рефлексы на шаре' }));
+    expect(h.timer.previousTask()).toBe('Рефлексы на шаре');
+  });
+
+  it('смена шага топик сессии не меняет; правка ориентира во время сессии — у шагов новые названия', async () => {
+    const h = await bootWith([sphere]);
+    h.timer.start({ itemId: 'sphere', type: 'practice', plannedMin: 45 });
+    const item = h.timer.item();
+    expect(item?.id).toBe('sphere');
+
+    h.timer.nextStep();
+    expect(h.timer.item()).toBe(item);
+
+    h.store.upsert('items', {
+      ...sphere,
+      guide: guide([
+        ['Построение', 20],
+        ['Светотень', 10],
+        ['Тон и рефлексы', 60],
+      ]),
+    });
+    expect(h.timer.item()).not.toBe(item);
+    expect(h.timer.stepViews().map((view) => view.title)).toEqual(['Построение', 'Светотень', 'Тон и рефлексы']);
+    expect(h.timer.activeStep()?.index).toBe(1);
   });
 });
