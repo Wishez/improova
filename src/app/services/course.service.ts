@@ -6,7 +6,19 @@ import { createId } from '../utils';
 import { DataStore } from './data.store';
 import { ToastService } from './toast.service';
 
-/** Курс: квартальные веса, маршрут по мастерам, версии курса и обновление (FR-39, FR-40, FR-44…FR-46). */
+/** Списки равны, когда в них те же записи в том же порядке. */
+const sameList = <T>(a: readonly T[], b: readonly T[]): boolean =>
+  a.length === b.length && a.every((entry, index) => entry === b[index]);
+
+/** Веса разделов равны по значению. */
+const sameWeights = (a: ReadonlyMap<string, number>, b: ReadonlyMap<string, number>): boolean =>
+  a.size === b.size && [...a].every(([id, weight]) => b.get(id) === weight);
+
+/**
+ * Курс: квартальные веса, маршрут по мастерам, версии курса и обновление (FR-39, FR-40, FR-44…FR-46).
+ * Веса и маршрут считаются из срезов `sections` и `routeBlocks` и сравниваются по значению: запись таймера в `meta`
+ * и правка раздела, не меняющая весов, их не пересчитывают дальше по цепочке (НФТ «Время отклика»).
+ */
 @Injectable({ providedIn: 'root' })
 export class CourseService {
   private readonly store = inject(DataStore);
@@ -14,18 +26,22 @@ export class CourseService {
 
   readonly week = computed(() => Math.max(1, challengeWeek(this.store.challenge().startDate, this.store.today())));
   readonly quarter = computed(() => quarterOfWeek(this.week()));
-  readonly sectionWeights = computed(() =>
-    sectionWeightsFor({
-      sections: this.store.data().sections.filter((section) => !section.archived),
-      quarter: this.quarter(),
-      seasonal: this.store.budget().seasonalWeights,
-    }),
+  readonly sectionWeights = computed(
+    () =>
+      sectionWeightsFor({
+        sections: this.store.sections().filter((section) => !section.archived),
+        quarter: this.quarter(),
+        seasonal: this.store.budget().seasonalWeights,
+      }),
+    { equal: sameWeights },
   );
-  readonly routeBlocks = computed(() =>
-    this.store
-      .data()
-      .routeBlocks.filter((block) => !block.deletedAt)
-      .sort((a, b) => a.order - b.order || a.fromWeek - b.fromWeek),
+  readonly routeBlocks = computed(
+    () =>
+      this.store
+        .routeBlocks()
+        .filter((block) => !block.deletedAt)
+        .sort((a, b) => a.order - b.order || a.fromWeek - b.fromWeek),
+    { equal: sameList },
   );
   readonly focus = computed(() => routeFocus(this.routeBlocks(), this.week()));
 
