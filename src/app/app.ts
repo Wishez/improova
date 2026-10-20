@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, HostListener, afterNextRender, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, HostListener, afterNextRender, computed, effect, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { TuiButton, TuiIcon, TuiRoot } from '@taiga-ui/core';
 import {
@@ -53,6 +53,12 @@ export class App {
   private readonly backup = inject(BackupService);
   private readonly notes = inject(NotesService);
   private readonly router = inject(Router);
+
+  /**
+   * Пока открыт режим фокуса, интерфейс под ним выключен для Tab, мыши и читалки (НФТ «Доступность интерфейса»).
+   * Условие — то же, при котором режим фокуса показан. Тосты и диалоги лежат вне `.shell` и остаются доступны.
+   */
+  protected readonly backgroundInert = computed(() => this.ui.focusMode() && this.timer.running());
 
   constructor() {
     // Диалог забытого таймера открываем после первой отрисовки, когда портал Taiga готов (FR-11).
