@@ -5,8 +5,9 @@ import { itemFixture, logFixture } from '../domain/test-fixtures';
 import { MemoryAdapter, STORAGE_ADAPTER } from '../storage';
 import type { IItem, ILogSteps, ITimeLog } from '../types';
 import { DataStore } from './data.store';
-import { LOG_ERROR_TEXT, LogsService, findOverlap, validateLog } from './logs.service';
+import { LOG_ERROR_TEXT, LogsService, findOverlap, spanForMinutes, validateLog } from './logs.service';
 import { parseBulkLines } from './program.service';
+import { TimerService } from './timer.service';
 import { ToastService } from './toast.service';
 
 describe('validateLog (FR-14)', () => {
@@ -191,6 +192,103 @@ describe('правка минут лога (FR-64, US-31)', () => {
     h.logs.update('log', { type: 'review' });
     expect(logOf(h, 'log')?.steps).toEqual(logSteps({}));
     expect(stopPlace({ item: own, logs: h.store.logs(), calendar: CALENDAR })).toBeNull();
+  });
+});
+
+describe('spanForMinutes: начало и конец лога новой длины (FR-13, FR-14, FR-64)', () => {
+  const at = (iso: string): number => Date.parse(iso);
+
+  it('меньше минут — конец раньше, начало на месте, как в 1.5', () => {
+    expect(spanForMinutes({ startedAt: '2026-10-12T17:25:00.000Z', endedAt: '2026-10-12T18:00:00.000Z', minutes: 30, nowMs: NOW })).toEqual({
+      startedAt: '2026-10-12T17:25:00.000Z',
+      endedAt: '2026-10-12T17:55:00.000Z',
+    });
+  });
+
+  it('больше минут, конец не позже «сейчас» — конец позже, начало на месте, как в 1.5', () => {
+    expect(spanForMinutes({ startedAt: '2026-10-12T16:00:00.000Z', endedAt: '2026-10-12T16:35:00.000Z', minutes: 40, nowMs: NOW })).toEqual({
+      startedAt: '2026-10-12T16:00:00.000Z',
+      endedAt: '2026-10-12T16:40:00.000Z',
+    });
+  });
+
+  it('Д-1: больше минут сразу после «Стоп» — конец остаётся «сейчас», не поместившееся сдвигает начало раньше', () => {
+    const span = spanForMinutes({ startedAt: '2026-10-12T17:30:00.000Z', endedAt: '2026-10-12T17:59:40.000Z', minutes: 40, nowMs: NOW });
+    expect(span).toEqual({ startedAt: '2026-10-12T17:20:00.000Z', endedAt: '2026-10-12T18:00:00.000Z' });
+    expect(validateLog(span, NOW)).toBeNull();
+    expect(at(span.endedAt) - at(span.startedAt)).toBe(40 * 60_000);
+  });
+
+  it('лог уже в будущем (часы устройства переводили) — остаётся там, validateLog отклоняет его, как в 1.5', () => {
+    const span = spanForMinutes({ startedAt: '2026-10-12T19:00:00.000Z', endedAt: '2026-10-12T19:30:00.000Z', minutes: 40, nowMs: NOW });
+    expect(span).toEqual({ startedAt: '2026-10-12T18:50:00.000Z', endedAt: '2026-10-12T19:30:00.000Z' });
+    expect(validateLog(span, NOW)).toBe('future');
+  });
+
+  it('негодное начало не превращается в дату — validateLog даёт «Проверь дату и время.»', () => {
+    const span = spanForMinutes({ startedAt: 'не дата', endedAt: '2026-10-12T18:00:00.000Z', minutes: 40, nowMs: NOW });
+    expect(validateLog(span, NOW)).toBe('invalid');
+  });
+});
+
+describe('Д-1 прогона З-13: увеличение минут сразу после «Стоп» (FR-13, FR-64; US-31, критерий 2)', () => {
+  /** Лог сессии, только что остановленной: конец — «сейчас», начало — «сейчас» минус минуты, как пишет «Стоп». */
+  const justStopped = (steps: ILogSteps): ITimeLog => {
+    const durationMin = steps.minutes.reduce((sum, value) => sum + value, 0);
+    return stepLog('log', new Date(NOW - durationMin * 60_000).toISOString(), steps);
+  };
+
+  it('ТК-31.2: в итоге 35 → 30 → 40 сразу после «Стоп» — шаг 2 — 10, затем 20, шаг 1 — 20; конец не в будущем', async () => {
+    const h = await boot([justStopped(logSteps({ minutes: [20, 15, 0, 0], stopIndex: 1 }))]);
+    expect(h.logs.setDuration('log', 30)).toBeNull();
+    expect(logOf(h, 'log')).toMatchObject({ durationMin: 30, steps: { minutes: [20, 10, 0, 0] } });
+    expect(h.logs.setDuration('log', 40)).toBeNull();
+    const log = logOf(h, 'log');
+    expect(log).toMatchObject({ durationMin: 40, steps: { minutes: [20, 20, 0, 0], stopIndex: 1, firstMinuteIndex: 0 } });
+    expect(log?.endedAt).toBe(new Date(NOW).toISOString());
+    expect(log?.startedAt).toBe(new Date(NOW - 40 * 60_000).toISOString());
+    expect(log?.editedAt).toBe(new Date(NOW).toISOString());
+    expect((await storedLogs(h))[0]).toMatchObject({ durationMin: 40, steps: { minutes: [20, 20, 0, 0] } });
+  });
+
+  it('ТК-Q021.7: в итоге 6 → 3 → 8, в списке логов 8 → 7 сразу после «Стоп» — шаг первой минуты прежний (Q-025, Д-28)', async () => {
+    const h = await boot([justStopped(logSteps({ minutes: [3, 1, 2, 0], stopIndex: 2, firstMinuteIndex: 1 }))]);
+    expect(h.logs.setDuration('log', 3)).toBeNull();
+    expect(logOf(h, 'log')?.steps).toMatchObject({ minutes: [3, 0, 0, 0], firstMinuteIndex: 1 });
+    expect(h.logs.setDuration('log', 8)).toBeNull();
+    expect(logOf(h, 'log')?.steps).toMatchObject({ minutes: [3, 0, 5, 0], firstMinuteIndex: 1 });
+    const edited = logOf(h, 'log');
+    // Список логов: начало не трогали, минуты 8 → 7 (FR-14)
+    const span = spanForMinutes({ startedAt: edited?.startedAt ?? '', endedAt: edited?.endedAt ?? '', minutes: 7, nowMs: Date.now() });
+    expect(h.logs.update('log', span)).toBeNull();
+    expect(logOf(h, 'log')).toMatchObject({ durationMin: 7, steps: { minutes: [3, 0, 4, 0], firstMinuteIndex: 1 } });
+    expect(logOf(h, 'log')?.editedAt).not.toBeNull();
+  });
+
+  it('«Сколько засчитать?»: «Засчитать» больше измеренного, затем в итоге ещё больше — проходит, разница по Д-7 на шаг остановки', async () => {
+    const h = await boot([]);
+    const timer = TestBed.inject(TimerService);
+    TestBed.tick();
+    expect(timer.start({ itemId: 'own', type: 'study', plannedMin: 45 })).toBe(true);
+    vi.setSystemTime(NOW + 10 * 60_000);
+    timer.nextStep();
+    // Таймер забыт на 4 ч 10 мин (ТД-11): засчитать 300 — больше измеренных 250
+    vi.setSystemTime(NOW + 250 * 60_000);
+    const logId = await timer.stop(300);
+    expect(logId).not.toBeNull();
+    const id = logId ?? '';
+    expect(logOf(h, id)).toMatchObject({ durationMin: 300, steps: { minutes: [10, 290, 0, 0], stopIndex: 1, firstMinuteIndex: 0 } });
+    expect(h.logs.setDuration(id, 320)).toBeNull();
+    const log = logOf(h, id);
+    expect(log).toMatchObject({ durationMin: 320, steps: { minutes: [10, 310, 0, 0], stopIndex: 1, firstMinuteIndex: 0 } });
+    expect(Date.parse(log?.endedAt ?? '')).toBeLessThanOrEqual(Date.now());
+  });
+
+  it('уменьшение в итоге по-прежнему сдвигает конец, начало на месте (как в 1.5)', async () => {
+    const original = justStopped(logSteps({ minutes: [20, 15, 0, 0], stopIndex: 1 }));
+    const h = await boot([original]);
+    expect(h.logs.setDuration('log', 30)).toBeNull();
+    expect(logOf(h, 'log')).toMatchObject({ startedAt: original.startedAt, endedAt: new Date(NOW - 5 * 60_000).toISOString() });
   });
 });
 

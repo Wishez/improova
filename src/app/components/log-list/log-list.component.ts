@@ -2,7 +2,16 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { TuiButton, TuiHint } from '@taiga-ui/core';
 import { ClockTimePipe, DayShortPipe, MinutesPipe } from '../../pipes';
-import { DataStore, LOG_ERROR_TEXT, LogsService, findOverlap, overlapText, validateLog } from '../../services';
+import {
+  DataStore,
+  LOG_ERROR_TEXT,
+  LogsService,
+  findOverlap,
+  overlapText,
+  spanForMinutes,
+  validateLog,
+  validateMinutes,
+} from '../../services';
 import type { ITimeLog, TSessionType } from '../../types';
 import { SESSION_TYPE_LABEL, fromLocalInputValue, toDayKey, toLocalInputValue } from '../../utils';
 
@@ -11,6 +20,9 @@ interface IDraft {
   readonly minutes: number;
   readonly type: TSessionType;
 }
+
+/** Номер списка на странице: списки в карточке топика и в «Статистике» бывают открыты вместе, id поля — свой у каждого. */
+let nextListId = 0;
 
 /** Список логов с инлайн-правкой и ручным добавлением (FR-14, US-03). */
 @Component({
@@ -37,6 +49,14 @@ export class LogListComponent {
   protected readonly draft = signal<IDraft>({ start: '', minutes: 30, type: 'practice' });
   protected readonly error = signal('');
   protected readonly overlapWarning = signal('');
+  private readonly listId = nextListId++;
+  protected readonly minutesId = `logMinutes-${this.listId}`;
+  protected readonly minutesErrorId = `logMinutesError-${this.listId}`;
+  /** Из поля минут ушли или нажали «Сохранить»: дальше ошибка поля следует за вводом (US-31, критерий 4). */
+  private readonly minutesTouched = signal(false);
+  protected readonly minutesError = computed(() =>
+    this.minutesTouched() && validateMinutes(this.draft().minutes) ? LOG_ERROR_TEXT.duration : '',
+  );
 
   protected readonly visible = computed(() =>
     [...this.logs()].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, this.limit()),
@@ -57,8 +77,7 @@ export class LogListComponent {
     this.adding.set(false);
     this.editingId.set(log.id);
     this.draft.set({ start: toLocalInputValue(log.startedAt), minutes: log.durationMin, type: log.type });
-    this.error.set('');
-    this.overlapWarning.set('');
+    this.resetMessages();
   }
 
   protected startAdding(): void {
@@ -67,15 +86,17 @@ export class LogListComponent {
     const start = new Date(Date.now() - 30 * 60_000).toISOString();
     const item = this.itemId() ? this.store.tree().itemById.get(this.itemId() ?? '') : undefined;
     this.draft.set({ start: toLocalInputValue(start), minutes: 30, type: item?.kind ?? 'creative' });
-    this.error.set('');
-    this.overlapWarning.set('');
+    this.resetMessages();
   }
 
   protected cancel(): void {
     this.editingId.set(null);
     this.adding.set(false);
-    this.error.set('');
-    this.overlapWarning.set('');
+    this.resetMessages();
+  }
+
+  protected touchMinutes(): void {
+    this.minutesTouched.set(true);
   }
 
   protected patch(field: keyof IDraft, event: Event): void {
@@ -104,31 +125,33 @@ export class LogListComponent {
       this.error.set(LOG_ERROR_TEXT.invalid);
       return;
     }
-    if (!Number.isFinite(draft.minutes) || draft.minutes < 1 || draft.minutes > 720) {
-      this.error.set(LOG_ERROR_TEXT.duration);
+    if (validateMinutes(draft.minutes)) {
+      // Ошибка — у поля минут, как при уходе из поля (US-31, критерий 4)
+      this.minutesTouched.set(true);
+      this.error.set('');
       return;
     }
-    const endedAt = new Date(Date.parse(startedAt) + Math.round(draft.minutes) * 60_000).toISOString();
-    const validation = validateLog({ startedAt, endedAt }, Date.now());
+    const span = this.spanOf(draft, startedAt);
+    const validation = validateLog(span, Date.now());
     if (validation) {
       this.error.set(LOG_ERROR_TEXT[validation]);
       return;
     }
     const editing = this.editingId();
-    const overlap = findOverlap({ startedAt, endedAt }, this.store.logs(), editing);
+    const overlap = findOverlap(span, this.store.logs(), editing);
     if (overlap && !this.overlapWarning()) {
       this.overlapWarning.set(overlapText(overlap));
       return;
     }
     if (editing) {
-      const error = this.logsService.update(editing, { startedAt, endedAt, type: draft.type });
+      const error = this.logsService.update(editing, { ...span, type: draft.type });
       if (error) {
         this.error.set(LOG_ERROR_TEXT[error]);
         return;
       }
     } else {
       // Ручной лог — без шагов: место остановки он не задаёт (FR-57, FR-65)
-      this.logsService.create({ itemId: this.itemId() ?? null, type: draft.type, startedAt, endedAt, source: 'manual', steps: null });
+      this.logsService.create({ itemId: this.itemId() ?? null, type: draft.type, ...span, source: 'manual', steps: null });
     }
     this.cancel();
   }
@@ -136,5 +159,25 @@ export class LogListComponent {
   protected remove(log: ITimeLog): void {
     this.cancel();
     this.logsService.remove(log.id);
+  }
+
+  /**
+   * Начало и конец по черновику. Начало лога не трогали — длина двигает конец, но не дальше текущего момента: увеличение
+   * сразу после «Стоп» сдвигает начало раньше (`spanForMinutes`; FR-14, FR-64). Начало ввели сами — конец = начало + минуты,
+   * в будущем — ошибка, как в 1.5.
+   */
+  private spanOf(draft: IDraft, startedAt: string): Pick<ITimeLog, 'startedAt' | 'endedAt'> {
+    const editing = this.editingId();
+    const original = editing ? this.logs().find((log) => log.id === editing) : undefined;
+    if (original && draft.start === toLocalInputValue(original.startedAt)) {
+      return spanForMinutes({ startedAt: original.startedAt, endedAt: original.endedAt, minutes: draft.minutes, nowMs: Date.now() });
+    }
+    return { startedAt, endedAt: new Date(Date.parse(startedAt) + Math.round(draft.minutes) * 60_000).toISOString() };
+  }
+
+  private resetMessages(): void {
+    this.error.set('');
+    this.overlapWarning.set('');
+    this.minutesTouched.set(false);
   }
 }

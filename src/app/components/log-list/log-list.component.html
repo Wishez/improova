@@ -4,10 +4,25 @@
       <span class="field__label">Начало</span>
       <input class="input" type="datetime-local" [value]="draft().start" (change)="patch('start', $event)" />
     </label>
-    <label class="field logEdit__minutes">
-      <span class="field__label">Минуты</span>
-      <input class="input num" type="number" min="1" max="720" [value]="draft().minutes" (input)="patch('minutes', $event)" />
-    </label>
+    <div class="field logEdit__minutes">
+      <label class="field__label" [for]="minutesId">Минуты</label>
+      <input
+        class="input num"
+        type="number"
+        min="1"
+        max="720"
+        [id]="minutesId"
+        [class.input_invalid]="minutesError()"
+        [attr.aria-invalid]="minutesError() ? 'true' : null"
+        [attr.aria-describedby]="minutesError() ? minutesErrorId : null"
+        [value]="draft().minutes"
+        (input)="patch('minutes', $event)"
+        (blur)="touchMinutes()"
+      />
+      @if (minutesError()) {
+        <span class="field__error" role="alert" [id]="minutesErrorId">{{ minutesError() }}</span>
+      }
+    </div>
     <label class="field">
       <span class="field__label">Тип</span>
       <select class="input" [value]="draft().type" (change)="patch('type', $event)">
