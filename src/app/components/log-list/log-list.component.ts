@@ -2,7 +2,16 @@ import { NgTemplateOutlet } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, input, signal } from '@angular/core';
 import { TuiButton, TuiHint } from '@taiga-ui/core';
 import { ClockTimePipe, DayShortPipe, MinutesPipe } from '../../pipes';
-import { DataStore, LOG_ERROR_TEXT, LogsService, findOverlap, overlapText, validateLog } from '../../services';
+import {
+  DataStore,
+  LOG_ERROR_TEXT,
+  LogsService,
+  findOverlap,
+  overlapText,
+  spanForMinutes,
+  validateLog,
+  validateMinutes,
+} from '../../services';
 import type { ITimeLog, TSessionType } from '../../types';
 import { SESSION_TYPE_LABEL, fromLocalInputValue, toDayKey, toLocalInputValue } from '../../utils';
 
@@ -104,31 +113,32 @@ export class LogListComponent {
       this.error.set(LOG_ERROR_TEXT.invalid);
       return;
     }
-    if (!Number.isFinite(draft.minutes) || draft.minutes < 1 || draft.minutes > 720) {
-      this.error.set(LOG_ERROR_TEXT.duration);
+    const minutesError = validateMinutes(draft.minutes);
+    if (minutesError) {
+      this.error.set(LOG_ERROR_TEXT[minutesError]);
       return;
     }
-    const endedAt = new Date(Date.parse(startedAt) + Math.round(draft.minutes) * 60_000).toISOString();
-    const validation = validateLog({ startedAt, endedAt }, Date.now());
+    const span = this.spanOf(draft, startedAt);
+    const validation = validateLog(span, Date.now());
     if (validation) {
       this.error.set(LOG_ERROR_TEXT[validation]);
       return;
     }
     const editing = this.editingId();
-    const overlap = findOverlap({ startedAt, endedAt }, this.store.logs(), editing);
+    const overlap = findOverlap(span, this.store.logs(), editing);
     if (overlap && !this.overlapWarning()) {
       this.overlapWarning.set(overlapText(overlap));
       return;
     }
     if (editing) {
-      const error = this.logsService.update(editing, { startedAt, endedAt, type: draft.type });
+      const error = this.logsService.update(editing, { ...span, type: draft.type });
       if (error) {
         this.error.set(LOG_ERROR_TEXT[error]);
         return;
       }
     } else {
       // Ручной лог — без шагов: место остановки он не задаёт (FR-57, FR-65)
-      this.logsService.create({ itemId: this.itemId() ?? null, type: draft.type, startedAt, endedAt, source: 'manual', steps: null });
+      this.logsService.create({ itemId: this.itemId() ?? null, type: draft.type, ...span, source: 'manual', steps: null });
     }
     this.cancel();
   }
@@ -136,5 +146,19 @@ export class LogListComponent {
   protected remove(log: ITimeLog): void {
     this.cancel();
     this.logsService.remove(log.id);
+  }
+
+  /**
+   * Начало и конец по черновику. Начало лога не трогали — длина двигает конец, но не дальше текущего момента: увеличение
+   * сразу после «Стоп» сдвигает начало раньше (`spanForMinutes`; FR-14, FR-64). Начало ввели сами — конец = начало + минуты,
+   * в будущем — ошибка, как в 1.5.
+   */
+  private spanOf(draft: IDraft, startedAt: string): Pick<ITimeLog, 'startedAt' | 'endedAt'> {
+    const editing = this.editingId();
+    const original = editing ? this.logs().find((log) => log.id === editing) : undefined;
+    if (original && draft.start === toLocalInputValue(original.startedAt)) {
+      return spanForMinutes({ startedAt: original.startedAt, endedAt: original.endedAt, minutes: draft.minutes, nowMs: Date.now() });
+    }
+    return { startedAt, endedAt: new Date(Date.parse(startedAt) + Math.round(draft.minutes) * 60_000).toISOString() };
   }
 }

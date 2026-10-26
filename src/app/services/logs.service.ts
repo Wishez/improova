@@ -49,6 +49,11 @@ export function validateLog(draft: Pick<ILogDraft, 'startedAt' | 'endedAt'>, now
   return minutes < 1 || minutes > MAX_LOG_MIN ? 'duration' : null;
 }
 
+/** Минуты лога, введённые вручную (FR-13, FR-14): от 1 до 720. Возвращает ошибку или null. */
+export function validateMinutes(minutes: number): TLogError | null {
+  return Number.isFinite(minutes) && minutes >= 1 && minutes <= MAX_LOG_MIN ? null : 'duration';
+}
+
 export function findOverlap(draft: Pick<ILogDraft, 'startedAt' | 'endedAt'>, logs: readonly ITimeLog[], ignoreId: string | null): ITimeLog | null {
   return (
     logs.find(
@@ -59,6 +64,32 @@ export function findOverlap(draft: Pick<ILogDraft, 'startedAt' | 'endedAt'>, log
 
 export function overlapText(log: ITimeLog): string {
   return `Пересекается с сессией ${formatTime(log.startedAt)}–${formatTime(log.endedAt)}. Сохранить обе?`;
+}
+
+/**
+ * Начало и конец лога новой длины (FR-13, FR-14, FR-64). Как в 1.5, длина двигает конец сессии, но конец не уходит
+ * дальше текущего момента (или прежнего конца, если он позже): не поместившееся сдвигает начало раньше. Поэтому
+ * увеличение минут сразу после «Стоп» не записывает сессию в будущее, а уменьшение по-прежнему двигает конец.
+ * Минуты шагов зависят только от длины (Д-7, ADR-007, правило 8). Лог, который уже в будущем (часы устройства
+ * переводили), там и остаётся — его, как в 1.5, отклоняет `validateLog`. Негодное начало возвращается как есть.
+ */
+export function spanForMinutes(params: {
+  readonly startedAt: string;
+  readonly endedAt: string;
+  readonly minutes: number;
+  readonly nowMs: number;
+}): Pick<ILogDraft, 'startedAt' | 'endedAt'> {
+  const lengthMs = Math.round(params.minutes) * 60_000;
+  const end = Date.parse(params.startedAt) + lengthMs;
+  if (!Number.isFinite(end)) {
+    return { startedAt: params.startedAt, endedAt: params.endedAt };
+  }
+  const currentEnd = Date.parse(params.endedAt);
+  const latest = Number.isNaN(currentEnd) ? params.nowMs : Math.max(currentEnd, params.nowMs);
+  if (end <= latest) {
+    return { startedAt: params.startedAt, endedAt: new Date(end).toISOString() };
+  }
+  return { startedAt: new Date(latest - lengthMs).toISOString(), endedAt: new Date(latest).toISOString() };
 }
 
 /** Минуты лога по началу и концу — как в 1.5: округление до целой минуты. */
@@ -124,16 +155,20 @@ export class LogsService {
     return null;
   }
 
-  /** Меняет длительность, сдвигая конец сессии. */
+  /**
+   * Меняет длительность в карточке итога (FR-13): конец сессии — по `spanForMinutes`, поэтому увеличение сразу после
+   * «Стоп» сдвигает начало раньше, а не уводит конец в будущее. Минуты шагов — по Д-7 в `update`.
+   */
   setDuration(id: string, minutes: number): TLogError | null {
     const log = this.store.data().timeLogs.find((entry) => entry.id === id);
     if (!log) {
       return 'invalid';
     }
-    if (!Number.isFinite(minutes) || minutes < 1 || minutes > MAX_LOG_MIN) {
-      return 'duration';
+    const error = validateMinutes(minutes);
+    if (error) {
+      return error;
     }
-    return this.update(id, { endedAt: new Date(Date.parse(log.startedAt) + Math.round(minutes) * 60_000).toISOString() });
+    return this.update(id, spanForMinutes({ startedAt: log.startedAt, endedAt: log.endedAt, minutes, nowMs: Date.now() }));
   }
 
   /**
