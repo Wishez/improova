@@ -21,6 +21,9 @@ interface IDraft {
   readonly type: TSessionType;
 }
 
+/** Номер списка на странице: списки в карточке топика и в «Статистике» бывают открыты вместе, id поля — свой у каждого. */
+let nextListId = 0;
+
 /** Список логов с инлайн-правкой и ручным добавлением (FR-14, US-03). */
 @Component({
   selector: 'app-log-list',
@@ -46,6 +49,14 @@ export class LogListComponent {
   protected readonly draft = signal<IDraft>({ start: '', minutes: 30, type: 'practice' });
   protected readonly error = signal('');
   protected readonly overlapWarning = signal('');
+  private readonly listId = nextListId++;
+  protected readonly minutesId = `logMinutes-${this.listId}`;
+  protected readonly minutesErrorId = `logMinutesError-${this.listId}`;
+  /** Из поля минут ушли или нажали «Сохранить»: дальше ошибка поля следует за вводом (US-31, критерий 4). */
+  private readonly minutesTouched = signal(false);
+  protected readonly minutesError = computed(() =>
+    this.minutesTouched() && validateMinutes(this.draft().minutes) ? LOG_ERROR_TEXT.duration : '',
+  );
 
   protected readonly visible = computed(() =>
     [...this.logs()].sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, this.limit()),
@@ -66,8 +77,7 @@ export class LogListComponent {
     this.adding.set(false);
     this.editingId.set(log.id);
     this.draft.set({ start: toLocalInputValue(log.startedAt), minutes: log.durationMin, type: log.type });
-    this.error.set('');
-    this.overlapWarning.set('');
+    this.resetMessages();
   }
 
   protected startAdding(): void {
@@ -76,15 +86,17 @@ export class LogListComponent {
     const start = new Date(Date.now() - 30 * 60_000).toISOString();
     const item = this.itemId() ? this.store.tree().itemById.get(this.itemId() ?? '') : undefined;
     this.draft.set({ start: toLocalInputValue(start), minutes: 30, type: item?.kind ?? 'creative' });
-    this.error.set('');
-    this.overlapWarning.set('');
+    this.resetMessages();
   }
 
   protected cancel(): void {
     this.editingId.set(null);
     this.adding.set(false);
-    this.error.set('');
-    this.overlapWarning.set('');
+    this.resetMessages();
+  }
+
+  protected touchMinutes(): void {
+    this.minutesTouched.set(true);
   }
 
   protected patch(field: keyof IDraft, event: Event): void {
@@ -113,9 +125,10 @@ export class LogListComponent {
       this.error.set(LOG_ERROR_TEXT.invalid);
       return;
     }
-    const minutesError = validateMinutes(draft.minutes);
-    if (minutesError) {
-      this.error.set(LOG_ERROR_TEXT[minutesError]);
+    if (validateMinutes(draft.minutes)) {
+      // Ошибка — у поля минут, как при уходе из поля (US-31, критерий 4)
+      this.minutesTouched.set(true);
+      this.error.set('');
       return;
     }
     const span = this.spanOf(draft, startedAt);
@@ -160,5 +173,11 @@ export class LogListComponent {
       return spanForMinutes({ startedAt: original.startedAt, endedAt: original.endedAt, minutes: draft.minutes, nowMs: Date.now() });
     }
     return { startedAt, endedAt: new Date(Date.parse(startedAt) + Math.round(draft.minutes) * 60_000).toISOString() };
+  }
+
+  private resetMessages(): void {
+    this.error.set('');
+    this.overlapWarning.set('');
+    this.minutesTouched.set(false);
   }
 }

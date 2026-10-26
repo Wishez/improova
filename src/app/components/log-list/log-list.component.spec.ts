@@ -8,7 +8,8 @@ import { LogListComponent } from './log-list.component';
 
 const NOW = Date.parse('2026-10-12T18:00:00.000Z');
 const MIN = 60_000;
-/** Текст ошибки — знак в знак из FR-14. */
+/** Тексты ошибок — знак в знак из FR-14 и US-31, критерий 4. */
+const DURATION_TEXT = 'Длительность — от 1 до 720 минут.';
 const FUTURE_TEXT = 'Нельзя записать сессию в будущем.';
 
 /** Лог только что остановленной сессии с шагами: конец — «сейчас», как пишет «Стоп» (ТК-31.2: шаг 1 — 20, шаг 2 — 15). */
@@ -81,6 +82,11 @@ function typeInto(view: IView, field: HTMLInputElement | null, value: string, ev
   view.fixture.detectChanges();
 }
 
+function leave(view: IView, field: HTMLInputElement | null): void {
+  field?.dispatchEvent(new Event('blur'));
+  view.fixture.detectChanges();
+}
+
 function save(view: IView): void {
   const buttons = view.root.querySelectorAll<HTMLButtonElement>('.logEdit__actions button');
   buttons.item(buttons.length - 1).click();
@@ -88,6 +94,19 @@ function save(view: IView): void {
 }
 
 const logOf = (view: IView): ITimeLog | undefined => view.store.data().timeLogs.find((log) => log.id === 'log');
+
+/** Ошибка поля, на которую ссылается поле минут: подсветка, aria-invalid и текст по aria-describedby. */
+function fieldError(view: IView): { readonly highlighted: boolean; readonly invalid: string | null; readonly text: string | null; readonly role: string | null } {
+  const field = minutesField(view);
+  const describedBy = field?.getAttribute('aria-describedby') ?? null;
+  const message = describedBy ? view.root.querySelector(`[id="${describedBy}"]`) : null;
+  return {
+    highlighted: field?.classList.contains('input_invalid') ?? false,
+    invalid: field?.getAttribute('aria-invalid') ?? null,
+    text: message?.textContent?.trim() ?? null,
+    role: message?.getAttribute('role') ?? null,
+  };
+}
 
 beforeEach(() => {
   vi.useFakeTimers({ now: NOW, toFake: ['Date'] });
@@ -128,5 +147,58 @@ describe('правка минут лога в списке логов сразу
     save(view);
     expect(view.root.querySelector('.logEdit__message')?.textContent?.trim()).toBe(FUTURE_TEXT);
     expect(logOf(view)).toEqual(original);
+  });
+});
+
+describe('поле минут в правке лога в списке логов (Д-2 прогона З-13; US-31, критерий 4; НФТ «Доступность интерфейса»)', () => {
+  for (const value of ['0', '800']) {
+    it(`ТК-31.4, шаг 3: ${value} мин и уход из поля — поле подсвечено, текст ошибки связан с полем для читалки, лог не меняется`, async () => {
+      const original = justStopped();
+      const view = await render([original]);
+      openEditor(view);
+      expect(fieldError(view)).toEqual({ highlighted: false, invalid: null, text: null, role: null });
+      typeInto(view, minutesField(view), value);
+      leave(view, minutesField(view));
+      expect(fieldError(view)).toEqual({ highlighted: true, invalid: 'true', text: DURATION_TEXT, role: 'alert' });
+      expect(logOf(view)).toEqual(original);
+    });
+  }
+
+  it('после ошибки правильное число снимает подсветку сразу, без ухода из поля', async () => {
+    const view = await render([justStopped()]);
+    openEditor(view);
+    typeInto(view, minutesField(view), '0');
+    leave(view, minutesField(view));
+    typeInto(view, minutesField(view), '800');
+    expect(fieldError(view)).toMatchObject({ highlighted: true, text: DURATION_TEXT });
+    typeInto(view, minutesField(view), '45');
+    expect(fieldError(view)).toEqual({ highlighted: false, invalid: null, text: null, role: null });
+  });
+
+  it('«Сохранить» с 0 мин — та же ошибка у поля, лог не меняется, второго текста ошибки нет', async () => {
+    const original = justStopped();
+    const view = await render([original]);
+    openEditor(view);
+    typeInto(view, minutesField(view), '0');
+    save(view);
+    expect(fieldError(view)).toEqual({ highlighted: true, invalid: 'true', text: DURATION_TEXT, role: 'alert' });
+    expect([...view.root.querySelectorAll('.field__error')].map((node) => node.textContent?.trim())).toEqual([DURATION_TEXT]);
+    expect(logOf(view)).toEqual(original);
+  });
+
+  it('у двух списков на странице свой id ошибки поля минут', async () => {
+    const view = await render([justStopped()]);
+    const second = TestBed.createComponent(LogListComponent);
+    second.componentRef.setInput('logs', view.store.logs());
+    second.detectChanges();
+    const other: IView = { fixture: second, store: view.store, root: second.nativeElement };
+    for (const each of [view, other]) {
+      openEditor(each);
+      typeInto(each, minutesField(each), '0');
+      leave(each, minutesField(each));
+    }
+    const ids = [view, other].map((each) => minutesField(each)?.getAttribute('aria-describedby'));
+    expect(ids[0]).toBeTruthy();
+    expect(ids[0]).not.toBe(ids[1]);
   });
 });
