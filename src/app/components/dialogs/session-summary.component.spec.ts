@@ -1,4 +1,4 @@
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { TuiRoot, provideTaiga } from '@taiga-ui/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +6,8 @@ import { itemFixture } from '../../domain/test-fixtures';
 import { DataStore, UiStateService } from '../../services';
 import { MemoryAdapter, STORAGE_ADAPTER } from '../../storage';
 import type { ILogSteps, ITimeLog } from '../../types';
+import { formatTime } from '../../utils';
+import { LogListComponent } from '../log-list/log-list.component';
 import { SessionSummaryComponent } from './session-summary.component';
 
 const NOW = Date.parse('2026-10-12T18:00:00.000Z');
@@ -43,12 +45,32 @@ function justStopped(patch: Partial<ILogSteps> = {}): ITimeLog {
   };
 }
 
-/** Оболочка с карточкой итога — как в приложении, под `tui-root`. */
+/** Прошлая сессия, записанная «Переключиться»: кончилась там, где началась остановленная (17:00–17:35). */
+const previous: ITimeLog = {
+  id: 'prev',
+  createdAt: at(NOW - 25 * MIN),
+  updatedAt: at(NOW - 25 * MIN),
+  itemId: null,
+  type: 'creative',
+  startedAt: at(NOW - 60 * MIN),
+  endedAt: at(NOW - 25 * MIN),
+  durationMin: 35,
+  source: 'timer',
+  editedAt: null,
+  steps: null,
+};
+
+/** Текст предупреждения FR-14 о пересечении с прошлой сессией — знак в знак. */
+const OVERLAP_TEXT = `Пересекается с сессией ${formatTime(previous.startedAt)}–${formatTime(previous.endedAt)}. Сохранить обе?`;
+
+/** Оболочка с карточкой итога и списком логов тех же данных — как в приложении, под `tui-root`. */
 @Component({
-  imports: [TuiRoot, SessionSummaryComponent],
-  template: '<tui-root><app-session-summary /></tui-root>',
+  imports: [TuiRoot, SessionSummaryComponent, LogListComponent],
+  template: '<tui-root><app-session-summary /><app-log-list [logs]="store.logs()" /></tui-root>',
 })
-class SummaryHostComponent {}
+class SummaryHostComponent {
+  protected readonly store = inject(DataStore);
+}
 
 /** В jsdom нет `matchMedia`, а Taiga по нему читает тему и настройку движения: ни один запрос не совпадает. */
 function stubMatchMedia(): void {
@@ -105,6 +127,20 @@ function enterMinutes(value: string): void {
   TestBed.tick();
 }
 
+const button = (label: string): HTMLButtonElement | null =>
+  [...(dialog()?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((entry) => text(entry) === label) ?? null;
+
+function click(label: string): void {
+  button(label)?.click();
+  TestBed.tick();
+}
+
+/** Окно Taiga убирается из DOM после макрозадачи. */
+async function settle(): Promise<void> {
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  TestBed.tick();
+}
+
 const alerts = (): readonly string[] => [...(dialog()?.querySelectorAll('[role="alert"]') ?? [])].map((node) => text(node));
 
 const logOf = (store: DataStore): ITimeLog | undefined => store.data().timeLogs.find((log) => log.id === 'log');
@@ -149,6 +185,114 @@ describe('заголовок карточки итога сразу после �
     expect(alerts()).toEqual(['Длительность — от 1 до 720 минут.']);
     expect(logOf(store)).toEqual(original);
     expect(heading()).toBe('Сессия записана · 25 мин');
+  });
+});
+
+describe('пересечение после правки минут в карточке итога (Q-050; FR-14, FR-64)', () => {
+  it('после «Переключиться»: 25 → 30 сдвигает начало на прошлую сессию — предупреждение role="alert", кнопки «Исправить время» и «Сохранить обе»; лог ждёт', async () => {
+    const original = justStopped();
+    const store = await render([previous, original]);
+    enterMinutes('30');
+    expect(alerts()).toEqual([OVERLAP_TEXT]);
+    expect(button('Исправить время')).not.toBeNull();
+    expect(button('Сохранить обе')).not.toBeNull();
+    expect(logOf(store)).toEqual(original);
+    expect(heading()).toBe('Сессия записана · 25 мин');
+  });
+
+  it('тот же текст и те же кнопки, что в списке логов при той же правке (FR-14)', async () => {
+    await render([previous, justStopped()]);
+    enterMinutes('30');
+    const root = document.querySelector<HTMLElement>('app-log-list');
+    if (!root) {
+      throw new Error('нет списка логов');
+    }
+    // Список — от новых к старым: первая строка — остановленная сессия; та же правка: 25 → 30 при прежнем начале
+    root.querySelector<HTMLButtonElement>('.logs__main')?.click();
+    TestBed.tick();
+    const field = root.querySelector<HTMLInputElement>('.logEdit input[type="number"]');
+    if (field) {
+      field.value = '30';
+      field.dispatchEvent(new Event('input'));
+    }
+    TestBed.tick();
+    const actions = [...root.querySelectorAll<HTMLButtonElement>('.logEdit__actions button')];
+    actions[actions.length - 1]?.click();
+    TestBed.tick();
+    const listAlerts = [...root.querySelectorAll('[role="alert"]')].map((node) => text(node));
+    const listButtons = [...root.querySelectorAll('.logEdit__actions button')].map((node) => text(node));
+    expect(listAlerts).toEqual([OVERLAP_TEXT]);
+    expect(alerts()).toEqual(listAlerts);
+    for (const label of listButtons) {
+      expect(button(label), label).not.toBeNull();
+    }
+    expect(listButtons).toEqual(['Исправить время', 'Сохранить обе']);
+  });
+
+  it('«Сохранить обе» — записано 30 мин: начало раньше, конец «сейчас», +5 мин шагу остановки (Д-7), шаг первой минуты прежний (Q-025); заголовок 30 мин, фокус в поле минут', async () => {
+    const store = await render([previous, justStopped()]);
+    enterMinutes('30');
+    click('Сохранить обе');
+    const log = logOf(store);
+    expect(log).toMatchObject({ durationMin: 30, steps: { minutes: [10, 20, 0, 0], stopIndex: 1, firstMinuteIndex: 0 } });
+    expect(log?.startedAt).toBe(at(NOW - 30 * MIN));
+    expect(log?.endedAt).toBe(at(NOW));
+    expect(log?.editedAt).not.toBeNull();
+    expect(store.data().timeLogs.find((entry) => entry.id === 'prev')).toEqual(previous);
+    expect(heading()).toBe('Сессия записана · 30 мин');
+    expect(alerts()).toEqual([]);
+    expect(button('Сохранить обе')).toBeNull();
+    expect(document.activeElement).toBe(minutesField());
+    expect(minutesField()?.value).toBe('30');
+  });
+
+  it('«Исправить время» — лог не изменён, в поле снова записанные 25 мин, фокус в поле; 28 — снова предупреждение, ввод убирает его, 20 без пересечения пишется сразу', async () => {
+    const original = justStopped();
+    const store = await render([previous, original]);
+    enterMinutes('30');
+    click('Исправить время');
+    expect(logOf(store)).toEqual(original);
+    expect(alerts()).toEqual([]);
+    expect(button('Исправить время')).toBeNull();
+    expect(document.activeElement).toBe(minutesField());
+    expect(minutesField()?.value).toBe('25');
+    expect(heading()).toBe('Сессия записана · 25 мин');
+    // 28 мин: начало 17:32 — раньше, чем кончилась прошлая (17:35), пересечение снова
+    enterMinutes('28');
+    expect(alerts()).toEqual([OVERLAP_TEXT]);
+    // Ввод в поле убирает предупреждение, как правка поля в списке логов
+    const field = minutesField();
+    if (field) {
+      field.value = '2';
+      field.dispatchEvent(new Event('input'));
+    }
+    TestBed.tick();
+    expect(alerts()).toEqual([]);
+    enterMinutes('20');
+    expect(logOf(store)).toMatchObject({ durationMin: 20, steps: { minutes: [10, 10, 0, 0] } });
+    expect(heading()).toBe('Сессия записана · 20 мин');
+  });
+
+  it('закрытие карточки с предупреждением ничего не пишет, следующая карточка открывается без него', async () => {
+    const original = justStopped();
+    const store = await render([previous, original]);
+    enterMinutes('30');
+    click('Готово');
+    await settle();
+    expect(dialog()).toBeNull();
+    expect(logOf(store)).toEqual(original);
+    TestBed.inject(UiStateService).summaryLogId.set('log');
+    TestBed.tick();
+    expect(heading()).toBe('Сессия записана · 25 мин');
+    expect(alerts()).toEqual([]);
+    expect(minutesField()?.value).toBe('25');
+  });
+
+  it('уменьшение без пересечения пишется сразу, предупреждения нет', async () => {
+    const store = await render([previous, justStopped()]);
+    enterMinutes('20');
+    expect(alerts()).toEqual([]);
+    expect(logOf(store)?.durationMin).toBe(20);
   });
 });
 

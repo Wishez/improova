@@ -32,6 +32,12 @@ export interface ILogCreate extends ILogDraft {
   readonly steps: ILogSteps | null;
 }
 
+/** Новая длина лога до записи (FR-13, FR-14): ошибка или сессия, с которой лог пересечётся; оба null — можно писать. */
+export interface IDurationCheck {
+  readonly error: TLogError | null;
+  readonly overlap: ITimeLog | null;
+}
+
 /** Проверка лога (FR-14). Возвращает ошибку или null. */
 export function validateLog(draft: Pick<ILogDraft, 'startedAt' | 'endedAt'>, nowMs: number): TLogError | null {
   const start = Date.parse(draft.startedAt);
@@ -168,7 +174,25 @@ export class LogsService {
     if (error) {
       return error;
     }
-    return this.update(id, spanForMinutes({ startedAt: log.startedAt, endedAt: log.endedAt, minutes, nowMs: Date.now() }));
+    return this.update(id, this.spanForDuration(log, minutes));
+  }
+
+  /**
+   * Проверка новой длины из карточки итога до записи — в том же порядке, что «Сохранить» в списке логов (FR-14):
+   * минуты, время, затем пересечение с другой сессией (Q-050). Начало и конец — те же, что запишет `setDuration`.
+   */
+  checkDuration(id: string, minutes: number): IDurationCheck {
+    const log = this.store.data().timeLogs.find((entry) => entry.id === id);
+    if (!log) {
+      return { error: 'invalid', overlap: null };
+    }
+    const invalid = validateMinutes(minutes);
+    if (invalid) {
+      return { error: invalid, overlap: null };
+    }
+    const span = this.spanForDuration(log, minutes);
+    const error = validateLog(span, Date.now());
+    return error ? { error, overlap: null } : { error: null, overlap: findOverlap(span, this.store.logs(), id) };
   }
 
   /**
@@ -182,5 +206,10 @@ export class LogsService {
     }
     this.store.remove('timeLogs', [id]);
     this.toasts.undo({ text: 'Сессия удалена', onUndo: () => this.store.upsert('timeLogs', log) });
+  }
+
+  /** Начало и конец лога новой длины из карточки итога: одно правило для проверки и записи (`spanForMinutes`). */
+  private spanForDuration(log: ITimeLog, minutes: number): Pick<ILogDraft, 'startedAt' | 'endedAt'> {
+    return spanForMinutes({ startedAt: log.startedAt, endedAt: log.endedAt, minutes, nowMs: Date.now() });
   }
 }

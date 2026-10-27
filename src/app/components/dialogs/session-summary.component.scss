@@ -1,0 +1,14 @@
+@reference '../../../tailwind.css';
+
+/* Предупреждение о пересечении — как в правке лога в списке логов (FR-14, Q-050) */
+.summaryOverlap {
+  @apply flex flex-col gap-2;
+}
+
+.summaryOverlap__text {
+  @apply text-meta text-warning;
+}
+
+.summaryOverlap__actions {
+  @apply flex flex-wrap gap-2;
+}
