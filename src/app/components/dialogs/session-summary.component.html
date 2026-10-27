@@ -1,8 +1,15 @@
 <ng-template
   [tuiDialog]="log() !== null"
-  [tuiDialogOptions]="{ label: heading(), size: 'm', dismissible: true }"
+  [tuiDialogOptions]="{ size: 'm', dismissible: true }"
   (tuiDialogChange)="onOpenChange($event)"
+  let-dialogId="id"
 >
+  <!-- Заголовок свой, а не label окна: label Taiga берёт один раз при открытии, а минуты меняются здесь же (Q-049). Имя окна — по id заголовка -->
+  <header>
+    <hgroup tuiTitle>
+      <h2 [attr.id]="headingId(dialogId)">{{ heading() }}</h2>
+    </hgroup>
+  </header>
   <div class="dlg">
     <p class="dlg__subtitle">{{ subtitle() }}</p>
     <label class="field dlg__short">

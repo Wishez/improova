@@ -1,6 +1,6 @@
 import { FormsModule } from '@angular/forms';
 import { ChangeDetectionStrategy, Component, computed, effect, inject, signal, untracked } from '@angular/core';
-import { TuiButton, TuiCheckbox, TuiDialog } from '@taiga-ui/core';
+import { TuiButton, TuiCheckbox, TuiDialog, TuiTitle } from '@taiga-ui/core';
 import { isCountable } from '../../domain';
 import { DataStore, LOG_ERROR_TEXT, LogsService, NotesService, ProgramService, SessionDraftService, UiStateService, type TDraftField } from '../../services';
 import { SESSION_TYPE_LABEL, formatMinutes } from '../../utils';
@@ -9,7 +9,7 @@ import { MarkdownEditorComponent } from '../markdown-editor/markdown-editor.comp
 /** Карточка итога после стопа таймера: длительность, рефлексия, галочка (FR-13, M7). Всё написанное — в черновике. */
 @Component({
   selector: 'app-session-summary',
-  imports: [FormsModule, TuiDialog, TuiButton, TuiCheckbox, MarkdownEditorComponent],
+  imports: [FormsModule, TuiDialog, TuiButton, TuiCheckbox, TuiTitle, MarkdownEditorComponent],
   templateUrl: './session-summary.component.html',
   styleUrl: './dialogs.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -66,6 +66,11 @@ export class SessionSummaryComponent {
         });
       }
     });
+  }
+
+  /** id заголовка — id окна Taiga, на него ссылается `aria-labelledby` окна; контекст окна шаблон получает без типа. */
+  protected headingId(dialogId: unknown): string | null {
+    return typeof dialogId === 'string' ? dialogId : null;
   }
 
   protected text(event: Event): string {
