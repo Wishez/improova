@@ -292,6 +292,48 @@ describe('Д-1 прогона З-13: увеличение минут сразу 
   });
 });
 
+describe('checkDuration: новая длина из карточки итога до записи (FR-14, Q-050)', () => {
+  /** Прошлая сессия, записанная «Переключиться»: кончилась там, где началась остановленная, — 17:00–17:35. */
+  const previous: ITimeLog = { ...stepLog('prev', '2026-10-12T17:00:00.000Z', logSteps({ minutes: [35, 0, 0, 0], stopIndex: 0 })), itemId: null, type: 'creative' };
+  /** Только что остановленная сессия 17:35–18:00. */
+  const stopped = stepLog('log', '2026-10-12T17:35:00.000Z', logSteps({ minutes: [10, 15, 0, 0], stopIndex: 1 }));
+
+  it('25 → 30 сдвигает начало на 17:30 — пересечение с прошлой сессией, ничего не записано', async () => {
+    const h = await boot([previous, stopped]);
+    expect(h.logs.checkDuration('log', 30)).toEqual({ error: null, overlap: previous });
+    expect(logOf(h, 'log')).toEqual(stopped);
+  });
+
+  it('новая длина без пересечения и уменьшение — можно писать; сам лог себе не мешает', async () => {
+    const h = await boot([previous, stopped]);
+    expect(h.logs.checkDuration('log', 25)).toEqual({ error: null, overlap: null });
+    expect(h.logs.checkDuration('log', 20)).toEqual({ error: null, overlap: null });
+  });
+
+  it('ошибка минут — раньше пересечения, как «Сохранить» в списке логов', async () => {
+    const h = await boot([previous, stopped]);
+    expect(h.logs.checkDuration('log', 0)).toEqual({ error: 'duration', overlap: null });
+    expect(h.logs.checkDuration('log', 800)).toEqual({ error: 'duration', overlap: null });
+    expect(h.logs.checkDuration('нет', 30)).toEqual({ error: 'invalid', overlap: null });
+  });
+
+  it('лог в будущем (часы переводили) — «future» раньше пересечения', async () => {
+    const future = stepLog('log', '2026-10-12T19:00:00.000Z', logSteps({ minutes: [10, 15, 0, 0], stopIndex: 1 }));
+    const h = await boot([{ ...previous, startedAt: '2026-10-12T18:30:00.000Z', endedAt: '2026-10-12T19:05:00.000Z' }, future]);
+    expect(h.logs.checkDuration('log', 30)).toEqual({ error: 'future', overlap: null });
+  });
+
+  it('проверка и запись дают одно начало и конец: после «Сохранить обе» лог там, где его проверили', async () => {
+    const h = await boot([previous, stopped]);
+    const overlap = h.logs.checkDuration('log', 30).overlap;
+    expect(overlap?.id).toBe('prev');
+    expect(h.logs.setDuration('log', 30)).toBeNull();
+    const log = logOf(h, 'log');
+    expect(log).toMatchObject({ startedAt: '2026-10-12T17:30:00.000Z', endedAt: '2026-10-12T18:00:00.000Z', durationMin: 30 });
+    expect(findOverlap({ startedAt: log?.startedAt ?? '', endedAt: log?.endedAt ?? '' }, h.store.logs(), 'log')).toEqual(overlap);
+  });
+});
+
 describe('удаление лога и «Отменить» (FR-64, Q-022)', () => {
   const first = stepLog('first', '2026-10-12T09:00:00.000Z', logSteps({ minutes: [10, 5, 0, 0], stopIndex: 1, circleId: 'c1' }));
 
