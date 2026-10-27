@@ -296,6 +296,63 @@ describe('пересечение после правки минут в карт�
   });
 });
 
+describe('сессии подряд через «Переключиться» — без предупреждения о пересечении (Q-051; FR-14, FR-64)', () => {
+  /** «Переключиться» за 10 мин 40 с до «Стоп»: прошлая сессия 17:19:20–17:49:20. */
+  const SWITCHED_AT = NOW - (10 * MIN + 40_000);
+  const switchedFrom: ITimeLog = {
+    ...previous,
+    id: 'switchedFrom',
+    createdAt: at(SWITCHED_AT),
+    updatedAt: at(SWITCHED_AT),
+    startedAt: at(SWITCHED_AT - 30 * MIN),
+    endedAt: at(SWITCHED_AT),
+    durationMin: 30,
+  };
+  /** Остановленная сессия 10 мин 40 с: записано 11 мин, начало 17:49:00 — на 20 с раньше конца прошлой, как пишет «Стоп». */
+  const stopped = (): ITimeLog => justStopped({ minutes: [11, 0, 0, 0], stopIndex: 0 });
+  const switchedText = `Пересекается с сессией ${formatTime(switchedFrom.startedAt)}–${formatTime(switchedFrom.endedAt)}. Сохранить обе?`;
+
+  /** «Сохранить» в списке логов у строки `row` (0 — новая сессия) без изменений; что список показал. */
+  function saveInList(row: number): { readonly alerts: readonly string[]; readonly editorOpen: boolean } {
+    const root = document.querySelector<HTMLElement>('app-log-list');
+    root?.querySelectorAll<HTMLButtonElement>('.logs__main').item(row)?.click();
+    TestBed.tick();
+    const actions = [...(root?.querySelectorAll<HTMLButtonElement>('.logEdit__actions button') ?? [])];
+    actions[actions.length - 1]?.click();
+    TestBed.tick();
+    return {
+      alerts: [...(root?.querySelectorAll('[role="alert"]') ?? [])].map((node) => text(node)),
+      editorOpen: root?.querySelector('.logEdit') !== null,
+    };
+  }
+
+  it('карточка итога: 11 → 10 записано сразу, предупреждения нет; минуты шагов по Д-7, шаг первой минуты прежний', async () => {
+    const store = await render([switchedFrom, stopped()]);
+    expect(Date.parse(switchedFrom.endedAt) - Date.parse(stopped().startedAt)).toBe(20_000);
+    enterMinutes('10');
+    expect(alerts()).toEqual([]);
+    expect(button('Сохранить обе')).toBeNull();
+    expect(logOf(store)).toMatchObject({ durationMin: 10, steps: { minutes: [10, 0, 0, 0], stopIndex: 0, firstMinuteIndex: 0 } });
+    expect(heading()).toBe('Сессия записана · 10 мин');
+  });
+
+  it('список логов: «Сохранить» у новой и у прошлой сессии без предупреждения — правка записана', async () => {
+    const store = await render([switchedFrom, stopped()]);
+    expect(saveInList(0)).toEqual({ alerts: [], editorOpen: false });
+    expect(logOf(store)).toMatchObject({ durationMin: 11, editedAt: at(NOW) });
+    expect(saveInList(1)).toEqual({ alerts: [], editorOpen: false });
+    expect(store.data().timeLogs.find((log) => log.id === 'switchedFrom')).toMatchObject({ durationMin: 30, editedAt: at(NOW) });
+  });
+
+  it('настоящее пересечение — 11 → 13 ставит начало на 2 мин 20 с раньше конца прошлой: предупреждение, лог ждёт', async () => {
+    const original = stopped();
+    const store = await render([switchedFrom, original]);
+    enterMinutes('13');
+    expect(alerts()).toEqual([switchedText]);
+    expect(logOf(store)).toEqual(original);
+  });
+});
+
 describe('правка минут в карточке итога и шаги (Д-7, Q-025; US-31)', () => {
   it('ТК-Q021.7 в итоге: 6 → 3 → 8 — шаг первой минуты прежний, хотя у шага 2 стало 0 мин; заголовок за каждым числом', async () => {
     const store = await render([justStopped({ minutes: [3, 1, 2, 0], stopIndex: 2, firstMinuteIndex: 1 })]);

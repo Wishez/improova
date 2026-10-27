@@ -31,6 +31,46 @@ describe('validateLog (FR-14)', () => {
   });
 });
 
+describe('findOverlap: пересечение не длиннее округления минут при «Стоп» не считается (Q-051; FR-14)', () => {
+  /** Сессия 10:00–10:30. */
+  const first = logFixture({ id: 'a', itemId: null, type: 'creative', startedAt: '2026-01-05T10:00:00.000Z', minutes: 30 });
+  /** Сессия 11 мин, начатая за `ms` до конца первой. */
+  const startingBefore = (ms: number): Pick<ITimeLog, 'startedAt' | 'endedAt'> => {
+    const start = Date.parse(first.endedAt) - ms;
+    return { startedAt: new Date(start).toISOString(), endedAt: new Date(start + 11 * 60_000).toISOString() };
+  };
+  /** Сессия 10 мин, кончившаяся через `ms` после начала первой. */
+  const endingAfter = (ms: number): Pick<ITimeLog, 'startedAt' | 'endedAt'> => {
+    const end = Date.parse(first.startedAt) + ms;
+    return { startedAt: new Date(end - 10 * 60_000).toISOString(), endedAt: new Date(end).toISOString() };
+  };
+
+  it('1–30 с — столько «Стоп» может прибавить, округляя минуты вверх: пересечения нет', () => {
+    for (const ms of [1, 20_000, 30_000]) {
+      expect(findOverlap(startingBefore(ms), [first], null), `начало раньше на ${ms} мс`).toBeNull();
+      expect(findOverlap(endingAfter(ms), [first], null), `конец позже на ${ms} мс`).toBeNull();
+    }
+  });
+
+  it('больше 30 с, минута и больше — пересечение, как в 1.5', () => {
+    for (const ms of [30_001, 45_000, 60_000, 5 * 60_000]) {
+      expect(findOverlap(startingBefore(ms), [first], null)?.id, `начало раньше на ${ms} мс`).toBe('a');
+      expect(findOverlap(endingAfter(ms), [first], null)?.id, `конец позже на ${ms} мс`).toBe('a');
+    }
+  });
+
+  it('стык без зазора — не пересечение; сессия внутри другой — пересечение', () => {
+    expect(findOverlap(startingBefore(0), [first], null)).toBeNull();
+    expect(findOverlap({ startedAt: '2026-01-05T10:10:00.000Z', endedAt: '2026-01-05T10:20:00.000Z' }, [first], null)?.id).toBe('a');
+  });
+
+  it('округление с одной сессией не прячет настоящее пересечение с другой', () => {
+    const second = logFixture({ id: 'b', itemId: null, type: 'creative', startedAt: '2026-01-05T10:35:00.000Z', minutes: 30 });
+    const draft = { startedAt: new Date(Date.parse(first.endedAt) - 20_000).toISOString(), endedAt: '2026-01-05T10:40:00.000Z' };
+    expect(findOverlap(draft, [first, second], null)?.id).toBe('b');
+  });
+});
+
 describe('parseBulkLines (FR-29)', () => {
   it('«название · 60» и строки без оценки', () => {
     expect(parseBulkLines('Глава 1 · 45\n\n  Видео про свет  \nКоробки | 90')).toEqual([
@@ -332,6 +372,61 @@ describe('checkDuration: новая длина из карточки итога 
     expect(log).toMatchObject({ startedAt: '2026-10-12T17:30:00.000Z', endedAt: '2026-10-12T18:00:00.000Z', durationMin: 30 });
     expect(findOverlap({ startedAt: log?.startedAt ?? '', endedAt: log?.endedAt ?? '' }, h.store.logs(), 'log')).toEqual(overlap);
   });
+});
+
+describe('логи, записанные подряд до правки Q-051 (1.5 и 1.6): начало на округление раньше конца прошлой', () => {
+  /** «Стоп» 1.5 и 1.6: начало — конец минус округлённые минуты. Сессия шла с конца прошлой 10 мин 40 с — записано 11 мин. */
+  const stoppedAt = (id: string, endedAt: string, minutes: number, steps: ILogSteps | null): ITimeLog => ({
+    id,
+    createdAt: endedAt,
+    updatedAt: endedAt,
+    itemId: 'own',
+    type: 'study',
+    startedAt: new Date(Date.parse(endedAt) - minutes * 60_000).toISOString(),
+    endedAt,
+    durationMin: minutes,
+    source: 'timer',
+    editedAt: null,
+    steps,
+  });
+  const first15 = stoppedAt('first', '2026-10-12T17:00:00.000Z', 30, null);
+  const second15 = stoppedAt('second', '2026-10-12T17:10:40.000Z', 11, null);
+  const first16 = stoppedAt('first', '2026-10-12T17:00:00.000Z', 30, logSteps({ minutes: [10, 20, 0, 0], stopIndex: 1 }));
+  const second16 = stoppedAt('second', '2026-10-12T17:10:40.000Z', 11, logSteps({ minutes: [10, 1, 0, 0], stopIndex: 1 }));
+
+  /** «Сохранить» в списке логов без смены начала: та же проверка, что `LogListComponent.save` (FR-14). */
+  const listOverlap = (h: IHarness, log: ITimeLog | undefined, minutes: number): ITimeLog | null =>
+    log
+      ? findOverlap(spanForMinutes({ startedAt: log.startedAt, endedAt: log.endedAt, minutes, nowMs: Date.now() }), h.store.logs(), log.id)
+      : null;
+
+  const cases: readonly { readonly version: string; readonly first: ITimeLog; readonly second: ITimeLog }[] = [
+    { version: '1.5', first: first15, second: second15 },
+    { version: '1.6', first: first16, second: second16 },
+  ];
+
+  for (const { version, first, second } of cases) {
+    it(`${version}: «Сохранить» обоих в списке логов и правка минут — без предупреждения; минуты и шаги — по Д-7`, async () => {
+      const h = await boot([first, second]);
+      expect(Date.parse(first.endedAt) - Date.parse(second.startedAt)).toBe(20_000);
+      expect(listOverlap(h, logOf(h, 'first'), 30)).toBeNull();
+      expect(listOverlap(h, logOf(h, 'second'), 11)).toBeNull();
+      expect(listOverlap(h, logOf(h, 'second'), 9)).toBeNull();
+      expect(h.logs.checkDuration('second', 10)).toEqual({ error: null, overlap: null });
+      expect(h.logs.setDuration('second', 10)).toBeNull();
+      expect(logOf(h, 'second')).toMatchObject({
+        durationMin: 10,
+        startedAt: second.startedAt,
+        steps: second.steps ? { minutes: [10, 0, 0, 0], stopIndex: 1, firstMinuteIndex: 0 } : null,
+      });
+    });
+
+    it(`${version}: начало, введённое на минуту раньше конца прошлой, — пересечение, как в 1.5`, async () => {
+      const h = await boot([first, second]);
+      // Начало ввели сами — 16:59, конец — начало плюс минуты (FR-14): 1 мин поверх прошлой сессии
+      expect(findOverlap({ startedAt: '2026-10-12T16:59:00.000Z', endedAt: '2026-10-12T17:10:00.000Z' }, h.store.logs(), 'second')).toEqual(first);
+    });
+  }
 });
 
 describe('удаление лога и «Отменить» (FR-64, Q-022)', () => {

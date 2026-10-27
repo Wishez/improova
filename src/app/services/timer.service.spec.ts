@@ -5,6 +5,7 @@ import { itemFixture } from '../domain/test-fixtures';
 import { MemoryAdapter, STORAGE_ADAPTER, type IWriteBatch } from '../storage';
 import type { IGuide, IItem, ILogSteps, INote, ITimeLog, ITimerState, TItemKind } from '../types';
 import { DataStore, defaultMeta } from './data.store';
+import { LogsService, findOverlap, spanForMinutes } from './logs.service';
 import { ToastService } from './toast.service';
 import { DEEP_WORK_LIMIT_MIN, TimerService, buildPhases, sessionEndText, shortStepTitle, stepPlanDoneText } from './timer.service';
 import { UiStateService } from './ui-state.service';
@@ -780,6 +781,87 @@ describe('запись сведений о шагах при «Стоп», «П�
     for (const [index, value] of minutes.entries()) {
       expect(Math.abs(value * 60_000 - (ms[index] ?? 0))).toBeLessThan(min(1));
     }
+  });
+});
+
+describe('сессии подряд через «Переключиться» не пересекаются (Q-051; FR-14, FR-64)', () => {
+  interface ISwitchedPair {
+    readonly h: IHarness;
+    readonly logs: LogsService;
+    readonly first: ITimeLog;
+    readonly second: ITimeLog;
+  }
+
+  /**
+   * Сессия A 20 мин → «Переключиться» → сессия B 10 мин 40 с → «Стоп». Минуты — как раньше (ADR-007, правило 7): B — 11 мин,
+   * начало B — конец минус 11 мин, на 20 с раньше конца A.
+   */
+  async function switchedPair(): Promise<ISwitchedPair> {
+    const h = await bootWith([sphere, artists]);
+    h.timer.start({ itemId: 'artists', type: 'study', plannedMin: 45 });
+    await at(min(20));
+    expect(h.timer.start({ itemId: 'sphere', type: 'practice', plannedMin: 45 })).toBe(false);
+    await h.timer.switchToPending();
+    await at(min(30) + sec(40));
+    const secondId = await h.timer.stop();
+    const first = h.store.data().timeLogs.find((log) => log.itemId === 'artists');
+    const second = h.store.data().timeLogs.find((log) => log.id === secondId);
+    if (!first || !second) {
+      throw new Error('сессии не записаны');
+    }
+    return { h, logs: TestBed.inject(LogsService), first, second };
+  }
+
+  const logOf = (pair: ISwitchedPair, id: string): ITimeLog | undefined => pair.h.store.data().timeLogs.find((log) => log.id === id);
+
+  /** «Сохранить» в списке логов без смены начала — та же проверка, что `LogListComponent.save` (FR-14). */
+  const listOverlap = (pair: ISwitchedPair, log: ITimeLog, minutes: number): ITimeLog | null =>
+    findOverlap(
+      spanForMinutes({ startedAt: log.startedAt, endedAt: log.endedAt, minutes, nowMs: Date.now() }),
+      pair.h.store.logs(),
+      log.id,
+    );
+
+  it('минуты пишутся как раньше: A — 20, B 10 мин 40 с — 11, минуты шагов с той же суммой; начало B на 20 с раньше конца A', async () => {
+    const { first, second } = await switchedPair();
+    expect(first).toMatchObject({ durationMin: 20, endedAt: new Date(START + min(20)).toISOString(), steps: { minutes: [20, 0, 0, 0] } });
+    expect(second).toMatchObject({
+      durationMin: 11,
+      endedAt: new Date(START + min(30) + sec(40)).toISOString(),
+      steps: { minutes: [11, 0, 0], stopIndex: 0, firstMinuteIndex: 0 },
+    });
+    expect(Date.parse(first.endedAt) - Date.parse(second.startedAt)).toBe(sec(20));
+  });
+
+  it('карточка итога: 11 → 10 и 10 → 11 без предупреждения; минуты шагов по Д-7, шаг первой минуты прежний (Q-025)', async () => {
+    const pair = await switchedPair();
+    const { logs, second } = pair;
+    expect(logs.checkDuration(second.id, 10)).toEqual({ error: null, overlap: null });
+    expect(logs.setDuration(second.id, 10)).toBeNull();
+    expect(logOf(pair, second.id)).toMatchObject({ durationMin: 10, startedAt: second.startedAt, steps: { minutes: [10, 0, 0], firstMinuteIndex: 0 } });
+    expect(logs.checkDuration(second.id, 11)).toEqual({ error: null, overlap: null });
+  });
+
+  it('список логов: «Сохранить» A и B с прежними и новыми минутами — без предупреждения, записано', async () => {
+    const pair = await switchedPair();
+    const { logs, first, second } = pair;
+    expect(listOverlap(pair, first, 20)).toBeNull();
+    expect(listOverlap(pair, first, 19)).toBeNull();
+    expect(listOverlap(pair, second, 11)).toBeNull();
+    expect(listOverlap(pair, second, 10)).toBeNull();
+    const span = spanForMinutes({ startedAt: second.startedAt, endedAt: second.endedAt, minutes: 11, nowMs: Date.now() });
+    expect(logs.update(second.id, { ...span, type: 'creative' })).toBeNull();
+    expect(logOf(pair, second.id)).toMatchObject({ durationMin: 11, type: 'creative', steps: { minutes: [11, 0, 0], firstMinuteIndex: 0 } });
+  });
+
+  it('настоящее пересечение предупреждается: 11 → 12 сразу после «Стоп» ставит начало B на 1 мин 20 с раньше конца A', async () => {
+    const pair = await switchedPair();
+    const { logs, first, second } = pair;
+    expect(logs.checkDuration(second.id, 12).overlap?.id).toBe(first.id);
+    expect(logOf(pair, second.id)).toEqual(second);
+    expect(logs.setDuration(second.id, 12)).toBeNull();
+    const extended = logOf(pair, second.id);
+    expect(extended && listOverlap(pair, extended, 12)?.id).toBe(first.id);
   });
 });
 
