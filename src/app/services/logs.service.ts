@@ -60,10 +60,24 @@ export function validateMinutes(minutes: number): TLogError | null {
   return Number.isFinite(minutes) && minutes >= 1 && minutes <= MAX_LOG_MIN ? null : 'duration';
 }
 
+/**
+ * Сколько сессии могут заходить друг на друга без предупреждения (Q-051): половина минуты. «Стоп» записывает минуты
+ * лога округлением (`Math.round`, ADR-007, правило 7) и начало — как конец минус эти минуты, поэтому записанное начало
+ * бывает раньше настоящего не больше чем на 30 с. У сессии, начатой сразу после другой («Переключиться»), такое начало
+ * заходит на прошлую; так же записаны и логи 1.5. Пересечение длиннее — настоящее (FR-14, Q-050).
+ */
+const ROUNDING_OVERLAP_MS = 30_000;
+
+/** Сессия, с которой пересекается черновик лога (FR-14); пересечение не длиннее округления минут не считается (Q-051). */
 export function findOverlap(draft: Pick<ILogDraft, 'startedAt' | 'endedAt'>, logs: readonly ITimeLog[], ignoreId: string | null): ITimeLog | null {
+  const start = Date.parse(draft.startedAt);
+  const end = Date.parse(draft.endedAt);
   return (
     logs.find(
-      (log) => log.id !== ignoreId && !log.deletedAt && log.startedAt < draft.endedAt && draft.startedAt < log.endedAt,
+      (log) =>
+        log.id !== ignoreId &&
+        !log.deletedAt &&
+        Math.min(end, Date.parse(log.endedAt)) - Math.max(start, Date.parse(log.startedAt)) > ROUNDING_OVERLAP_MS,
     ) ?? null
   );
 }
