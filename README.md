@@ -24,6 +24,8 @@ npm run build:pages  # сборка под GitHub Pages (/improova/)
 Push в `main` → GitHub Actions (`.github/workflows/deploy.yml`) прогоняет тесты, собирает и публикует на GitHub Pages.
 Однократно: Settings → Pages → Source: **GitHub Actions**.
 
+Заметки к выпускам — [CHANGELOG.md](CHANGELOG.md): что нового и что сделать до обновления.
+
 ### Откат
 
 1. До выпуска релиза, который меняет схему данных (`SCHEMA_VERSION`), — полный экспорт JSON в каждом браузере: «Настройки» → «Скачать копию (JSON)».
