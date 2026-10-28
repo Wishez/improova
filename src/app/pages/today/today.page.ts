@@ -2,10 +2,21 @@ import { ChangeDetectionStrategy, Component, computed, inject } from '@angular/c
 import { Router, RouterLink } from '@angular/router';
 import { TuiButton, TuiHint } from '@taiga-ui/core';
 import { TuiProgress } from '@taiga-ui/kit';
-import { EmptyStateComponent } from '../../components';
+import { EmptyStateComponent, StartHintComponent } from '../../components';
 import { progressOfItems, sectionItems, weeklyPlan, type IPlannedBlock, type ITip } from '../../domain';
 import { ClockTimePipe, DayShortPipe, MarkdownPipe, MinutesPipe } from '../../pipes';
-import { BackupService, CourseService, DataStore, InsightsService, PlanService, ProgramService, TimerService, UiStateService } from '../../services';
+import {
+  BackupService,
+  CourseService,
+  DataStore,
+  InsightsService,
+  PlanService,
+  ProgramService,
+  StopPlaceService,
+  TimerService,
+  UiStateService,
+  type IStartHint,
+} from '../../services';
 import type { ITimeLog } from '../../types';
 import { SESSION_TYPE_LABEL, diffDays, formatDayShort, toDayKey, weekStart, weekdayAccusative, weekdayIndex, weekdayShort } from '../../utils';
 
@@ -14,7 +25,7 @@ const BACKUP_REMINDER_DAYS = 28;
 /** Экран «Сегодня»: что делать сейчас (FR-02…FR-04). */
 @Component({
   selector: 'app-today-page',
-  imports: [RouterLink, TuiButton, TuiHint, TuiProgress, EmptyStateComponent, MinutesPipe, DayShortPipe, ClockTimePipe, MarkdownPipe],
+  imports: [RouterLink, TuiButton, TuiHint, TuiProgress, EmptyStateComponent, StartHintComponent, MinutesPipe, DayShortPipe, ClockTimePipe, MarkdownPipe],
   templateUrl: './today.page.html',
   styleUrl: './today.page.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
@@ -29,6 +40,7 @@ export class TodayPage {
   private readonly program = inject(ProgramService);
   protected readonly course = inject(CourseService);
   protected readonly router = inject(Router);
+  private readonly stopPlace = inject(StopPlaceService);
 
   protected readonly typeLabel = SESSION_TYPE_LABEL;
 
@@ -59,6 +71,21 @@ export class TodayPage {
     return this.store.logs().filter((log) => toDayKey(new Date(log.startedAt), boundary) === today);
   });
   protected readonly blocks = computed(() => this.planner.today()?.blocks ?? []);
+  /** Топик идущей сессии: подсказка показывается до старта, у идущей сессии её нет. */
+  private readonly runningItemId = computed(() => this.timer.state()?.itemId ?? null);
+  /** Подсказка блока по его типу (FR-58): тот же шаг, с которого «Старт» блока и Space начнут сессию. */
+  protected readonly startHints = computed<ReadonlyMap<string, IStartHint>>(() => {
+    const starts = this.stopPlace.today();
+    const running = this.runningItemId();
+    const hints = new Map<string, IStartHint>();
+    for (const block of this.blocks()) {
+      const start = starts.get(block.key);
+      if (start && block.itemId !== running) {
+        hints.set(block.key, start.hint);
+      }
+    }
+    return hints;
+  });
   protected readonly todayMinutes = computed(() => this.todayLogs().reduce((sum, log) => sum + log.durationMin, 0));
   protected readonly nextDay = computed(() => {
     const day = this.planner.plan().days.slice(1).find((entry) => entry.blocks.length > 0);
@@ -83,7 +110,7 @@ export class TodayPage {
       .map((review) => ({ review, title: this.store.tree().itemById.get(review.itemId)?.title ?? '' })),
   );
   protected readonly lastNote = computed(() =>
-    [...this.store.data().notes]
+    [...this.store.notes()]
       .filter((note) => note.body.trim() || note.worked.trim() || note.next.trim())
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))[0] ?? null,
   );

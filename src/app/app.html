@@ -28,7 +28,7 @@
       </main>
     }
     @case ('ready') {
-      <div class="shell" [class.shell_bare]="!store.meta().onboarded">
+      <div class="shell" [class.shell_bare]="!store.meta().onboarded" [inert]="backgroundInert()">
         @if (store.meta().onboarded) {
           <nav class="nav" aria-label="Разделы приложения">
             <a class="nav__brand" routerLink="/today" aria-label="Импрува — на главную">
@@ -56,6 +56,7 @@
           </main>
         </div>
       </div>
+      <!-- Окна, режим фокуса и тосты — вне .shell: в режиме фокуса фон inert, а они доступны с клавиатуры и читалке -->
       <app-item-drawer />
       <app-session-summary />
       <app-forgotten-dialog />

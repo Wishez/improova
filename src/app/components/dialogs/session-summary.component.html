@@ -1,17 +1,43 @@
 <ng-template
   [tuiDialog]="log() !== null"
-  [tuiDialogOptions]="{ label: heading(), size: 'm', dismissible: true }"
+  [tuiDialogOptions]="{ size: 'm', dismissible: true }"
   (tuiDialogChange)="onOpenChange($event)"
+  let-dialogId="id"
 >
+  <!-- Заголовок свой, а не label окна: label Taiga берёт один раз при открытии, а минуты меняются здесь же (Q-049). Имя окна — по id заголовка -->
+  <header>
+    <hgroup tuiTitle>
+      <h2 [attr.id]="headingId(dialogId)">{{ heading() }}</h2>
+    </hgroup>
+  </header>
   <div class="dlg">
     <p class="dlg__subtitle">{{ subtitle() }}</p>
     <label class="field dlg__short">
       <span class="field__label">Длительность, мин</span>
-      <input class="input num" type="number" min="1" max="720" [class.input_invalid]="durationError()" [value]="duration()" (change)="setDuration($event)" />
+      <input
+        #minutesField
+        class="input num"
+        type="number"
+        min="1"
+        max="720"
+        [class.input_invalid]="durationError()"
+        [value]="duration()"
+        (input)="clearOverlap()"
+        (change)="setDuration($event)"
+      />
       @if (durationError()) {
         <span class="field__error" role="alert">{{ durationError() }}</span>
       }
     </label>
+    @if (overlapWarning()) {
+      <div class="summaryOverlap">
+        <span class="summaryOverlap__text" role="alert">{{ overlapWarning() }}</span>
+        <div class="summaryOverlap__actions">
+          <button tuiButton type="button" size="xs" appearance="flat" (click)="fixTime(minutesField)">Исправить время</button>
+          <button tuiButton type="button" size="xs" appearance="secondary" (click)="keepBoth(minutesField)">Сохранить обе</button>
+        </div>
+      </div>
+    }
     <div class="dlg__grid">
       <label class="field">
         <span class="field__label">Что получилось</span>

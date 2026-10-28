@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, inject, signal, type Signal } from '@angular/core';
 import { buildProgramTree, spentByItem } from '../domain';
 import { SCHEMA_VERSION, STORAGE_ADAPTER, emptyCollections, normalizeCollections, type IWriteBatch } from '../storage';
 import type { IBudget, IChallenge, ICollections, IEntity, IMeta, ISettings, ISnapshot, TCollection } from '../types';
@@ -35,29 +35,50 @@ export class DataStore {
   readonly data = signal<ICollections>(emptyCollections());
   readonly unsaved = signal(0);
 
-  readonly meta = computed<IMeta>(() => this.data().meta.find((entry) => entry.id === META_ID) ?? defaultMeta());
-  readonly settings = computed<ISettings>(() => {
-    const settings = { ...DEFAULT_SETTINGS, ...this.meta().settings };
-    // Все расчёты дней читают settings() до toDayKey, поэтому пояс синхронен с ними
-    configureTimeZone(settings.timeZone);
-    return settings;
-  });
-  readonly budget = computed<IBudget>(() => this.data().budgets[0] ?? defaultBudget(new Date().toISOString()));
+  /**
+   * Коллекции по отдельности (НФТ «Время отклика»): у среза новая ссылка, только когда изменилась сама коллекция.
+   * Запись `meta` таймером их не меняет, поэтому всё, что от них считается, при смене шага и на тиках не пересчитывается.
+   */
+  readonly sections = this.collection('sections');
+  readonly topics = this.collection('topics');
+  readonly items = this.collection('items');
+  readonly timeLogs = this.collection('timeLogs');
+  readonly planBlocks = this.collection('planBlocks');
+  readonly resources = this.collection('resources');
+  readonly notes = this.collection('notes');
+  readonly assets = this.collection('assets');
+  readonly routeBlocks = this.collection('routeBlocks');
+  private readonly budgets = this.collection('budgets');
+  private readonly challenges = this.collection('challenges');
+  private readonly metaEntries = this.collection('meta');
+
+  readonly meta = computed<IMeta>(() => this.metaEntries().find((entry) => entry.id === META_ID) ?? defaultMeta());
+  /** Новое значение — только при изменении настроек по значению: запись таймера в `meta` его не меняет. */
+  readonly settings = computed<ISettings>(
+    () => {
+      const settings = { ...DEFAULT_SETTINGS, ...this.meta().settings };
+      // Все расчёты дней читают settings() до toDayKey, поэтому пояс синхронен с ними
+      configureTimeZone(settings.timeZone);
+      return settings;
+    },
+    { equal: sameSettings },
+  );
+  readonly budget = computed<IBudget>(() => this.budgets()[0] ?? defaultBudget(new Date().toISOString()));
   readonly challenge = computed<IChallenge>(
-    () => this.data().challenges[0] ?? defaultChallenge(new Date().toISOString(), this.today()),
+    () => this.challenges()[0] ?? defaultChallenge(new Date().toISOString(), this.today()),
   );
   readonly today = computed(() => toDayKey(new Date(this.clock.now()), this.settings().dayBoundaryHour));
   readonly tree = computed(() =>
-    buildProgramTree({ sections: this.data().sections, topics: this.data().topics, items: this.data().items }),
+    buildProgramTree({ sections: this.sections(), topics: this.topics(), items: this.items() }),
   );
   readonly logs = computed(() =>
-    this.data()
-      .timeLogs.filter((log) => !log.deletedAt)
+    this.timeLogs()
+      .filter((log) => !log.deletedAt)
       .sort((a, b) => a.startedAt.localeCompare(b.startedAt)),
   );
   readonly spent = computed(() => spentByItem(this.logs()));
-  readonly resourcesById = computed(() => new Map(this.data().resources.map((resource) => [resource.id, resource])));
-  readonly assetsById = computed(() => new Map(this.data().assets.map((asset) => [asset.id, asset])));
+  readonly resourcesById = computed(() => new Map(this.resources().map((resource) => [resource.id, resource])));
+  readonly assetsById = computed(() => new Map(this.assets().map((asset) => [asset.id, asset])));
 
   private readonly pending = new Map<string, { readonly collection: TCollection; readonly entity: IEntity | null; readonly id: string }>();
   private retryIndex = 0;
@@ -281,6 +302,29 @@ export class DataStore {
     }
     return Promise.resolve();
   }
+
+  /** Срез коллекции: `upsert`, `remove` и `commit` заменяют массив только у коллекций, которые меняют. */
+  private collection<K extends TCollection>(key: K): Signal<ICollections[K]> {
+    return computed(() => this.data()[key]);
+  }
+}
+
+/** Правило сравнения для каждого поля настроек: поле `ISettings` без правила здесь не компилируется. */
+const SETTINGS_EQUAL: { readonly [K in keyof ISettings]-?: (a: ISettings, b: ISettings) => boolean } = {
+  dayBoundaryHour: (a, b) => a.dayBoundaryHour === b.dayBoundaryHour,
+  timeZone: (a, b) => a.timeZone === b.timeZone,
+  reviewWeekday: (a, b) => a.reviewWeekday === b.reviewWeekday,
+  sound: (a, b) => a.sound === b.sound,
+  phases: (a, b) => a.phases === b.phases,
+  tipsEnabled: (a, b) => a.tipsEnabled === b.tipsEnabled,
+  disabledTips: (a, b) =>
+    a.disabledTips.length === b.disabledTips.length &&
+    a.disabledTips.every((id, index) => id === b.disabledTips[index]),
+};
+
+/** Настройки равны по значению всех полей. */
+function sameSettings(a: ISettings, b: ISettings): boolean {
+  return Object.values(SETTINGS_EQUAL).every((equal) => equal(a, b));
 }
 
 export function defaultMeta(): IMeta {

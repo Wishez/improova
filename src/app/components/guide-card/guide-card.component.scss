@@ -52,6 +52,11 @@
   @apply flex flex-wrap items-baseline gap-x-2;
 }
 
+/* Метка активного шага в сессии: шаг отмечен словом, не только подсветкой (НФТ «Доступность интерфейса») */
+.guide__current {
+  @apply rounded-control bg-surface-3 px-1.5 py-0.5 text-micro font-semibold text-text-1;
+}
+
 .guide__hint {
   @apply m-0 text-meta;
 }
